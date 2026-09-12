@@ -1,0 +1,58 @@
+name: Bug report
+description: Report incorrect or unexpected behavior
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Release tag or source revision.
+      placeholder: v0.1.0 or commit SHA
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - API and authentication
+        - Redirects and caching
+        - Storage
+        - Analytics
+        - AWS infrastructure and deployment
+        - Local development and tooling
+        - Other or unsure
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe what you did, what happened, and what you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Redact API keys, credentials, personal data, account IDs, and active malicious URLs.
+      render: shell
+    validations:
+      required: false
+  - type: checkboxes
+    id: security
+    attributes:
+      label: Security check
+      options:
+        - label: This report does not disclose a security vulnerability. Security issues are reported privately according to SECURITY.md.
+          required: true

@@ -1,0 +1,38 @@
+# Local implementation plans
+docs/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.*
+*.coverprofile
+profile.cov
+go.work
+go.work.sum
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# Web
+node_modules/
+web/dist/
+
+# Build artifacts
+dist/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
