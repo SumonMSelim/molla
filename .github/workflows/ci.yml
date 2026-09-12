@@ -34,8 +34,15 @@ jobs:
       - name: Build
         run: make build GO=go
 
-      - name: Test (race)
-        run: make test GO=go
+      - name: Test (race and coverage)
+        run: make coverage GO=go
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.out
+          fail_ci_if_error: true
 
   terraform:
     runs-on: ubuntu-latest

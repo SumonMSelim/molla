@@ -1,6 +1,7 @@
 # molla
 
 [![CI](https://github.com/SumonMSelim/molla/actions/workflows/ci.yml/badge.svg)](https://github.com/SumonMSelim/molla/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/SumonMSelim/molla/graph/badge.svg)](https://codecov.io/gh/SumonMSelim/molla)
 [![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![AWS](https://img.shields.io/badge/AWS-Lambda%20%7C%20DynamoDB%20%7C%20CloudFront-FF9900?logo=amazonwebservices&logoColor=white)](https://aws.amazon.com)
 [![Terraform](https://img.shields.io/badge/Terraform-1.16-844FBA?logo=terraform&logoColor=white)](https://www.terraform.io)
@@ -35,6 +36,7 @@ Toolchains run in official Docker images by default:
 ```sh
 make build      # compile all Go packages
 make test       # run Go tests with the race detector
+make coverage   # run race tests and write coverage.out
 make vet        # run go vet
 make lint       # check Go formatting
 make bench      # run Go benchmarks

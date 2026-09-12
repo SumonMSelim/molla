@@ -11,13 +11,16 @@ GO    ?= $(DOCKER_GO) go
 GOFMT ?= $(DOCKER_GO) gofmt
 TF    ?= docker run --rm -v "$(CURDIR)/$(TF_DIR)":/w -w /w $(TF_IMAGE)
 
-.PHONY: build test vet lint bench tf-check
+.PHONY: build test coverage vet lint bench tf-check
 
 build:
 	$(GO) build ./...
 
 test:
 	$(GO) test -race ./...
+
+coverage:
+	$(GO) test -race -covermode=atomic -coverprofile=coverage.out ./...
 
 vet:
 	$(GO) vet ./...
