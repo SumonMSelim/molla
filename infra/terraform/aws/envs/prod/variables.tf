@@ -22,9 +22,9 @@ variable "admin_principal_arns" {
   type = list(string)
 }
 
+# No default: prod must be given real build artifacts (placeholders are dev/validate only).
 variable "artifact_dir" {
-  type    = string
-  default = "../../placeholders"
+  type = string
 }
 
 variable "budget_limit" {
@@ -68,8 +68,15 @@ variable "domain_name" {
   default     = ""
 }
 
-variable "hosted_zone_id" {
+variable "cloudflare_zone_id" {
   type        = string
-  description = "Route53 zone for ACM validation and alias. Required when domain_name is set."
+  description = "Cloudflare zone for ACM validation and the apex CNAME. Required when domain_name is set."
+  default     = ""
+}
+
+variable "origin_verify_secret" {
+  type        = string
+  description = "Shared secret Cloudflare stamps on origin requests. Required when domain_name is set."
+  sensitive   = true
   default     = ""
 }

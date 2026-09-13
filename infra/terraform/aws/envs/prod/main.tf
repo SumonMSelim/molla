@@ -11,10 +11,10 @@ locals {
   quota_headroom = {
     lambda_redirect_provisioned = 192
     kinesis_shards              = 20
-    api_gateway_stage_rate      = 12
+    api_gateway_stage_rate      = 185
+    api_gateway_stage_burst     = 370
     dynamodb_on_demand          = "adaptive"
     vpc_interface_endpoints     = 2
-    waf_rate_limit              = 2000
   }
   account_controls = {
     cloudtrail      = var.central_cloudtrail_arn
@@ -84,6 +84,8 @@ module "api" {
   permutation_key         = var.permutation_key
   privacy_key             = var.privacy_key
   provisioned_concurrency = local.quota_headroom.lambda_redirect_provisioned
+  throttle_rate_limit     = local.quota_headroom.api_gateway_stage_rate
+  throttle_burst_limit    = local.quota_headroom.api_gateway_stage_burst
   admin_principal_arns    = var.admin_principal_arns
   alarm_actions           = [aws_sns_topic.alarms.arn]
   tags                    = local.tags
@@ -96,9 +98,9 @@ module "edge" {
   api_gateway_id        = module.api.rest_api_id
   redirect_function_url = module.api.redirect_function_url
   redirect_function_arn = module.api.redirect_function_arn
-  enable_waf            = true
   domain_name           = var.domain_name
-  hosted_zone_id        = var.hosted_zone_id
+  cloudflare_zone_id    = var.cloudflare_zone_id
+  origin_verify_secret  = var.origin_verify_secret
   alarm_actions         = [aws_sns_topic.alarms.arn]
   tags                  = local.tags
 }

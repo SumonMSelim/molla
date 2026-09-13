@@ -37,7 +37,7 @@ Aligned design:
 - Go authenticates hashed developer credentials and enforces ownership.
 - API and redirect paths have separate roles and scaling controls.
 - Storage, streams, cache traffic, logs, artifacts, and state require encryption.
-- Public redirect traffic is protected by CloudFront and AWS WAF; API usage plans constrain developers.
+- Public redirect traffic is protected by Cloudflare (proxy, WAF, rate limiting) in front of CloudFront, which rejects requests that bypass Cloudflare; API usage plans constrain developers.
 - User destinations are parsed but never fetched synchronously.
 
 Required before production:
@@ -93,7 +93,7 @@ Aligned design:
 - Serverless and on-demand services avoid idle application capacity at launch.
 - Function URL avoids API Gateway request charges on the redirect path.
 - Data lifecycle policies bound idempotency, logs, analytics, and deleted-link storage.
-- Costly controls such as WAF are explicit design decisions.
+- Costly controls such as a second WAF layer are explicit design decisions; Cloudflare provides the firewall.
 
 Required before production:
 

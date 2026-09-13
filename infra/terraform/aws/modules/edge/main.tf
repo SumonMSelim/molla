@@ -96,6 +96,18 @@ resource "aws_cloudfront_cache_policy" "api" {
   }
 }
 
+# Forwarded to the origin but excluded from the cache key: forwarding it via
+# the cache policy instead would fragment the 5s redirect cache per client IP.
+resource "aws_cloudfront_origin_request_policy" "redirect" {
+  name = "${var.name_prefix}-redirect-origin"
+  cookies_config { cookie_behavior = "none" }
+  headers_config {
+    header_behavior = "whitelist"
+    headers { items = ["CF-Connecting-IP"] }
+  }
+  query_strings_config { query_string_behavior = "none" }
+}
+
 resource "aws_cloudfront_origin_request_policy" "api" {
   name = "${var.name_prefix}-api-origin"
   cookies_config { cookie_behavior = "none" }
@@ -125,7 +137,40 @@ resource "aws_cloudfront_response_headers_policy" "security" {
   }
 }
 
+resource "aws_cloudfront_function" "viewer_request" {
+  count   = var.domain_name == "" ? 0 : 1
+  name    = "${var.name_prefix}-viewer-request"
+  runtime = "cloudfront-js-2.0"
+  comment = "Reject requests that did not come through Cloudflare."
+  publish = true
+  code    = templatefile("${path.module}/viewer_request.js.tftpl", { secret = var.origin_verify_secret })
+}
+
+# One viewer-request function per behavior is allowed, and /app/* needs both the
+# Cloudflare origin check and the SPA rewrite, so they are combined here.
+resource "aws_cloudfront_function" "spa_rewrite" {
+  name    = "${var.name_prefix}-spa-rewrite"
+  runtime = "cloudfront-js-2.0"
+  comment = "Serve the SPA shell for /app deep links."
+  publish = true
+  code = templatefile("${path.module}/spa_rewrite.js.tftpl", {
+    verify = var.domain_name == "" ? "" : local.origin_verify_js
+  })
+}
+
 locals {
+  origin_verify_js = <<-EOT
+      var header = request.headers['x-origin-verify'];
+      if (!header || header.value !== '${var.origin_verify_secret}') {
+        return {
+          statusCode: 403,
+          statusDescription: 'Forbidden',
+          headers: { 'cache-control': { value: 'no-store' } }
+        };
+      }
+      delete request.headers['x-origin-verify'];
+  EOT
+
   redirect_domain = replace(replace(var.redirect_function_url, "https://", ""), "/", "")
   api_domain      = "${var.api_gateway_id}.execute-api.${data.aws_region.current.region}.amazonaws.com"
 }
@@ -136,7 +181,6 @@ resource "aws_cloudfront_distribution" "this" {
   comment             = var.name_prefix
   price_class         = "PriceClass_100"
   aliases             = var.domain_name == "" ? [] : [var.domain_name]
-  web_acl_id          = var.enable_waf ? aws_wafv2_web_acl.edge[0].arn : null
   default_root_object = ""
   tags                = var.tags
 
@@ -177,7 +221,15 @@ resource "aws_cloudfront_distribution" "this" {
     cached_methods             = ["GET", "HEAD"]
     compress                   = true
     cache_policy_id            = aws_cloudfront_cache_policy.redirect.id
+    origin_request_policy_id   = aws_cloudfront_origin_request_policy.redirect.id
     response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
+    dynamic "function_association" {
+      for_each = aws_cloudfront_function.viewer_request
+      content {
+        event_type   = "viewer-request"
+        function_arn = function_association.value.arn
+      }
+    }
   }
 
   ordered_cache_behavior {
@@ -190,6 +242,13 @@ resource "aws_cloudfront_distribution" "this" {
     cache_policy_id            = aws_cloudfront_cache_policy.api.id
     origin_request_policy_id   = aws_cloudfront_origin_request_policy.api.id
     response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
+    dynamic "function_association" {
+      for_each = aws_cloudfront_function.viewer_request
+      content {
+        event_type   = "viewer-request"
+        function_arn = function_association.value.arn
+      }
+    }
   }
 
   ordered_cache_behavior {
@@ -201,6 +260,10 @@ resource "aws_cloudfront_distribution" "this" {
     compress                   = true
     cache_policy_id            = aws_cloudfront_cache_policy.redirect.id
     response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.spa_rewrite.arn
+    }
   }
 
   restrictions {
@@ -219,6 +282,7 @@ resource "aws_lambda_permission" "cloudfront_redirect" {
   statement_id  = "AllowCloudFrontOAC"
   action        = "lambda:InvokeFunctionUrl"
   function_name = var.redirect_function_arn
+  qualifier     = "live"
   principal     = "cloudfront.amazonaws.com"
   source_arn    = aws_cloudfront_distribution.this.arn
 }

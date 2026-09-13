@@ -1,0 +1,10 @@
+function handler(event) {
+  var request = event.request;
+${verify}
+  var uri = request.uri;
+  var last = uri.slice(uri.lastIndexOf('/') + 1);
+  if (uri === '/app' || last === '' || last.indexOf('.') === -1) {
+    request.uri = '/app/index.html';
+  }
+  return request;
+}

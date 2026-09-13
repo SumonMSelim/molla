@@ -31,6 +31,25 @@ func NewCache(client *goredis.Client) *Cache {
 	return &Cache{client: client}
 }
 
+// putScript is the version-aware compare-and-set from DESIGN.md, run as a
+// single atomic Lua call: it reads the stored version and writes only when the
+// incoming version is greater than or equal to it. A separate GET then SET
+// would let a concurrent writer (e.g. the invalidate Lambda tombstoning a
+// deleted link) land between the two calls and be overwritten with stale data.
+var putScript = goredis.NewScript(`
+local existing = redis.call('GET', KEYS[1])
+if existing then
+  local ok, decoded = pcall(cjson.decode, existing)
+  if ok and type(decoded) == 'table' and decoded['version'] then
+    if tonumber(decoded['version']) > tonumber(ARGV[2]) then
+      return 0
+    end
+  end
+end
+redis.call('SET', KEYS[1], ARGV[1], 'PX', tonumber(ARGV[3]))
+return 1
+`)
+
 func (c *Cache) Get(ctx context.Context, code string, now time.Time) (platform.CacheRecord, platform.CacheOutcome, error) {
 	raw, err := c.client.Get(ctx, keyPrefix+code).Bytes()
 	if err == goredis.Nil {
@@ -61,16 +80,6 @@ func (c *Cache) Get(ctx context.Context, code string, now time.Time) (platform.C
 }
 
 func (c *Cache) Put(ctx context.Context, record platform.CacheRecord) error {
-	raw, err := c.client.Get(ctx, keyPrefix+record.ShortCode).Bytes()
-	if err != nil && err != goredis.Nil {
-		return err
-	}
-	if err == nil {
-		var existing cachePayload
-		if json.Unmarshal(raw, &existing) == nil && record.Version < existing.Version {
-			return nil
-		}
-	}
 	if record.State == platform.CacheDeleted {
 		record.LongURL = ""
 	}
@@ -79,13 +88,13 @@ func (c *Cache) Put(ctx context.Context, record platform.CacheRecord) error {
 		return err
 	}
 	ttl := record.StaleUntil.Sub(time.Now().UTC())
-	if record.State == platform.CacheActive {
-		ttl = record.ExpiresAt.Sub(time.Now().UTC())
-	}
 	if ttl < time.Second {
 		ttl = time.Second
 	}
-	return c.client.Set(ctx, keyPrefix+record.ShortCode, body, ttl).Err()
+	return putScript.Run(ctx, c.client,
+		[]string{keyPrefix + record.ShortCode},
+		body, record.Version, ttl.Milliseconds(),
+	).Err()
 }
 
 func payloadFromRecord(record platform.CacheRecord) cachePayload {
