@@ -33,14 +33,12 @@ resource "aws_lambda_function" "api" {
   tracing_config { mode = "Active" }
   environment {
     variables = {
-      MOLLA_PERMUTATION_KEY     = var.permutation_key
-      MOLLA_PUBLIC_BASE         = var.public_base
-      MOLLA_INVALIDATE_FUNCTION = aws_lambda_function.invalidate.function_name
-      MOLLA_LINKS_TABLE         = var.table_names["links"]
-      MOLLA_STATS_TABLE         = var.table_names["stats"]
-      MOLLA_COUNTERS_TABLE      = var.table_names["counters"]
-      MOLLA_IDEMPOTENCY_TABLE   = var.table_names["idempotency"]
-      MOLLA_CREDENTIALS_TABLE   = var.table_names["credentials"]
+      MOLLA_PERMUTATION_KEY   = var.permutation_key
+      MOLLA_PUBLIC_BASE       = var.public_base
+      MOLLA_LINKS_TABLE       = var.table_names["links"]
+      MOLLA_STATS_TABLE       = var.table_names["stats"]
+      MOLLA_COUNTERS_TABLE    = var.table_names["counters"]
+      MOLLA_IDEMPOTENCY_TABLE = var.table_names["idempotency"]
     }
   }
   depends_on = [aws_cloudwatch_log_group.api]

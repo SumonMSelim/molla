@@ -10,7 +10,7 @@ Terminal 1, API with in-memory adapters (Docker):
 make dev-api
 ```
 
-Listens on `http://127.0.0.1:8080`. Seeds credential `dev-local-key` (override with `MOLLA_DEV_API_KEY`). Paste that key into the UI. Create returns a `short_url` on the same origin; `GET /{code}` is a 302.
+Listens on `http://127.0.0.1:8080`. Create and stats are unauthenticated. Create returns a `short_url` on the same origin; `GET /{code}` is a 302.
 
 Terminal 2, Vite (proxies `/api` to the Go process):
 
@@ -20,7 +20,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173/app/`. The API key is kept in `sessionStorage` only. Links created in this browser are listed from `localStorage`.
+Open `http://127.0.0.1:5173/app/`. Links created in this browser are listed from `localStorage` so this browser can find them again; that list is local only and isn't fetched from the API.
 
 Toolchain in Docker instead of host Node:
 

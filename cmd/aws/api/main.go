@@ -1,6 +1,7 @@
-// Command api is the AWS Lambda entrypoint for the JSON API (create, stats,
-// delete) behind API Gateway. It wires adapters into the mux from
-// internal/handlers and holds no logic itself.
+// Command api is the AWS Lambda entrypoint for the public JSON API (create,
+// stats) behind API Gateway. It wires adapters into the mux from
+// internal/handlers and holds no logic itself. Create and stats are
+// unauthenticated in this release; takedown is operator-only via cmd/admin.
 package main
 
 import (
@@ -14,12 +15,10 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	awslambda "github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 
 	awsadapter "github.com/SumonMSelim/molla/internal/adapters/aws"
 	ddb "github.com/SumonMSelim/molla/internal/adapters/aws/dynamodb"
-	lam "github.com/SumonMSelim/molla/internal/adapters/aws/lambda"
 	"github.com/SumonMSelim/molla/internal/adapters/logging"
 	"github.com/SumonMSelim/molla/internal/core"
 	"github.com/SumonMSelim/molla/internal/handlers"
@@ -39,21 +38,13 @@ func newHandler() (http.Handler, error) {
 		return nil, err
 	}
 	ddbClient := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) { o.Retryer = awsadapter.Retryer() })
-	lambdaClient := awslambda.NewFromConfig(cfg, func(o *awslambda.Options) { o.Retryer = awsadapter.Retryer() })
-	function := os.Getenv("MOLLA_INVALIDATE_FUNCTION")
-	if function == "" {
-		function = "molla-invalidate"
-	}
 	return handlers.New(handlers.Deps{
-		Store:       ddb.NewLinkStore(ddbClient),
-		Allocator:   ddb.NewIDAllocator(ddbClient, os.Getenv("AWS_REGION"), 0),
-		Clock:       liveClock{},
-		Credentials: ddb.NewIdentityStore(ddbClient),
-		Permuter:    permuter,
-		PublicBase:  os.Getenv("MOLLA_PUBLIC_BASE"),
-		Stats:       ddb.NewStatsStore(ddbClient),
-		Invalidator: lam.NewInvalidator(lambdaClient, function),
-		Audit:       logging.Sink{W: os.Stderr},
+		Store:      ddb.NewLinkStore(ddbClient),
+		Allocator:  ddb.NewIDAllocator(ddbClient, os.Getenv("AWS_REGION"), 0),
+		Clock:      liveClock{},
+		Permuter:   permuter,
+		PublicBase: os.Getenv("MOLLA_PUBLIC_BASE"),
+		Stats:      ddb.NewStatsStore(ddbClient),
 	}), nil
 }
 

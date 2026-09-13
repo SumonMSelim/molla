@@ -1,8 +1,6 @@
-export const API_KEY_STORAGE = 'molla.apiKey'
 export const LINKS_STORAGE = 'molla.links'
 
 export type ApiErrorCode =
-  | 'UNAUTHORIZED'
   | 'INVALID_URL'
   | 'INVALID_ALIAS'
   | 'INVALID_EXPIRY'
@@ -11,11 +9,9 @@ export type ApiErrorCode =
   | 'IDEMPOTENCY_CONFLICT'
   | 'RATE_LIMITED'
   | 'TEMPORARILY_UNAVAILABLE'
-  | 'FORBIDDEN'
   | 'NOT_FOUND'
 
 export const ERROR_MESSAGES: Record<ApiErrorCode, string> = {
-  UNAUTHORIZED: 'API key missing or invalid.',
   INVALID_URL: 'URL is not a valid http(s) address.',
   INVALID_ALIAS: 'Alias fails charset or length rules.',
   INVALID_EXPIRY: 'Expiry must be between 60 and 157680000 seconds.',
@@ -24,7 +20,6 @@ export const ERROR_MESSAGES: Record<ApiErrorCode, string> = {
   IDEMPOTENCY_CONFLICT: 'Idempotency key was used for a different request.',
   RATE_LIMITED: 'Too many requests; try again later.',
   TEMPORARILY_UNAVAILABLE: 'Service temporarily unavailable.',
-  FORBIDDEN: 'You do not own this link.',
   NOT_FOUND: 'Link not found.',
 }
 
@@ -45,19 +40,6 @@ export function messageFor(code: string): string {
     return ERROR_MESSAGES[code as ApiErrorCode]
   }
   return 'Something went wrong.'
-}
-
-export function getApiKey(): string {
-  return sessionStorage.getItem(API_KEY_STORAGE) ?? ''
-}
-
-export function setApiKey(key: string): void {
-  const trimmed = key.trim()
-  if (trimmed === '') {
-    sessionStorage.removeItem(API_KEY_STORAGE)
-    return
-  }
-  sessionStorage.setItem(API_KEY_STORAGE, trimmed)
 }
 
 export type StoredLink = {
@@ -116,7 +98,7 @@ export type LinkStats = {
   last_click_at?: string
 }
 
-export async function createLink(input: CreateLinkInput, apiKey = getApiKey()): Promise<CreateLinkResult> {
+export async function createLink(input: CreateLinkInput): Promise<CreateLinkResult> {
   const body: Record<string, unknown> = { long_url: input.long_url }
   if (input.alias) {
     body.alias = input.alias
@@ -126,40 +108,25 @@ export async function createLink(input: CreateLinkInput, apiKey = getApiKey()): 
   }
   return request<CreateLinkResult>('/api/v1/links', {
     method: 'POST',
-    apiKey,
     idempotencyKey: crypto.randomUUID(),
     body: JSON.stringify(body),
   })
 }
 
-export async function getStats(shortCode: string, apiKey = getApiKey()): Promise<LinkStats> {
+export async function getStats(shortCode: string): Promise<LinkStats> {
   return request<LinkStats>(`/api/v1/links/${encodeURIComponent(shortCode)}/stats`, {
     method: 'GET',
-    apiKey,
-  })
-}
-
-export async function deleteLink(shortCode: string, apiKey = getApiKey()): Promise<void> {
-  await request<void>(`/api/v1/links/${encodeURIComponent(shortCode)}`, {
-    method: 'DELETE',
-    apiKey,
-    empty: true,
   })
 }
 
 type RequestOptions = {
   method: string
-  apiKey: string
   body?: string
   idempotencyKey?: string
-  empty?: boolean
 }
 
 async function request<T>(path: string, options: RequestOptions): Promise<T> {
   const headers: Record<string, string> = {}
-  if (options.apiKey) {
-    headers['X-Api-Key'] = options.apiKey
-  }
   if (options.body) {
     headers['Content-Type'] = 'application/json'
   }
@@ -171,9 +138,6 @@ async function request<T>(path: string, options: RequestOptions): Promise<T> {
     headers,
     body: options.body,
   })
-  if (options.empty && response.status === 204) {
-    return undefined as T
-  }
   const text = await response.text()
   let parsed: { error?: string } & T
   try {

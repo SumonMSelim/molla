@@ -71,7 +71,6 @@ dev-api:
 	  -e MOLLA_PERMUTATION_KEY=molla-slice-1-fixed-test-key \
 	  -e MOLLA_PRIVACY_KEY=molla-local-privacy-key \
 	  -e MOLLA_PUBLIC_BASE=http://127.0.0.1:8080 \
-	  -e MOLLA_DEV_API_KEY=dev-local-key \
 	  -e MOLLA_LISTEN=:8080 \
 	  $(GO_IMAGE) go run ./cmd/server
 

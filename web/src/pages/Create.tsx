@@ -1,5 +1,5 @@
 import { useId, useState, type FormEvent } from 'react'
-import { ApiError, createLink, getApiKey, rememberLink, setApiKey, type StoredLink } from '../api.ts'
+import { ApiError, createLink, rememberLink, type StoredLink } from '../api.ts'
 import { Chrome } from './Chrome.tsx'
 import { LinkPage } from './Link.tsx'
 
@@ -16,8 +16,6 @@ export function CreatePage({ selected, onOpen, onClear }: CreatePageProps) {
   const urlId = useId()
   const aliasId = useId()
   const expiryId = useId()
-  const keyId = useId()
-  const [apiKey, setApiKeyField] = useState(getApiKey)
   const [longUrl, setLongUrl] = useState('')
   const [alias, setAlias] = useState('')
   const [expiresIn, setExpiresIn] = useState('')
@@ -30,18 +28,14 @@ export function CreatePage({ selected, onOpen, onClear }: CreatePageProps) {
     event.preventDefault()
     setError('')
     setCopied(false)
-    setApiKey(apiKey)
     setBusy(true)
     try {
       const expires_in = expiresIn.trim() === '' ? undefined : Number(expiresIn)
-      const result = await createLink(
-        {
-          long_url: longUrl.trim(),
-          alias: alias.trim() || undefined,
-          expires_in,
-        },
-        apiKey.trim(),
-      )
+      const result = await createLink({
+        long_url: longUrl.trim(),
+        alias: alias.trim() || undefined,
+        expires_in,
+      })
       rememberLink({
         short_code: result.short_code,
         short_url: result.short_url,
@@ -68,24 +62,7 @@ export function CreatePage({ selected, onOpen, onClear }: CreatePageProps) {
   }
 
   return (
-    <Chrome
-      trailing={
-        <label className="flex min-w-0 max-w-56 flex-col gap-1">
-          <span className="text-[10px] font-medium tracking-[0.08em] text-muted-foreground uppercase">API key</span>
-          <input
-            id={keyId}
-            name="api_key"
-            type="password"
-            autoComplete="off"
-            aria-label="API key"
-            value={apiKey}
-            onChange={(e) => setApiKeyField(e.target.value)}
-            className="flex h-9 w-full border border-input bg-background px-3 text-sm outline-none focus-visible:border-brand focus-visible:glow"
-            required
-          />
-        </label>
-      }
-    >
+    <Chrome>
         <form onSubmit={onSubmit} className="relative pt-5">
           <div className="absolute top-0 left-6 z-10 border border-b-0 border-border bg-card px-4 py-2 text-sm font-medium">
             Short link
@@ -178,7 +155,7 @@ export function CreatePage({ selected, onOpen, onClear }: CreatePageProps) {
             <LinkPage
               code={selected}
               onBack={onClear}
-              onDeleted={(code) => {
+              onForgotten={(code) => {
                 if (created?.short_code === code) {
                   setCreated(null)
                 }

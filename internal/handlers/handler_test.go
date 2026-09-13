@@ -17,13 +17,7 @@ import (
 )
 
 const (
-	testAPIToken   = "dev-test-token"
-	testOtherToken = "dev-other-token"
 	testPermuteKey = "molla-slice-1-fixed-test-key"
-	testActor      = "actor"
-	testOwner      = "owner"
-	testOtherOwner = "other-owner"
-	testOtherActor = "other-actor"
 )
 
 type countingStore struct {
@@ -37,17 +31,14 @@ func (s *countingStore) Create(ctx context.Context, link platform.Link, idem *pl
 }
 
 type harness struct {
-	handler     http.Handler
-	store       *memory.LinkStore
-	counted     *countingStore
-	clock       *memory.Clock
-	creds       *memory.CredentialStore
-	alloc       *memory.IDAllocator
-	cache       *memory.Cache
-	invalidator *memory.CacheInvalidator
-	audit       *memory.AuditSink
-	stats       *memory.StatsStore
-	now         time.Time
+	handler http.Handler
+	store   *memory.LinkStore
+	counted *countingStore
+	clock   *memory.Clock
+	alloc   *memory.IDAllocator
+	cache   *memory.Cache
+	stats   *memory.StatsStore
+	now     time.Time
 }
 
 func newHarness(t *testing.T, publicBase string) *harness {
@@ -56,63 +47,39 @@ func newHarness(t *testing.T, publicBase string) *harness {
 	store := memory.NewLinkStore()
 	counted := &countingStore{LinkStore: store}
 	clock := memory.NewClock(now)
-	creds := memory.NewCredentialStore()
 	alloc := memory.NewIDAllocator(0)
 	cache := memory.NewCache()
-	invalidator := memory.NewCacheInvalidator(cache)
-	audit := &memory.AuditSink{}
 	stats := memory.NewStatsStore()
 	permuter, err := core.NewPermuter([]byte(testPermuteKey))
 	if err != nil {
 		t.Fatal(err)
 	}
-	seedCredential(t, creds, testAPIToken, testActor, testOwner, now, now.Add(24*time.Hour), platform.CredentialActive)
-	seedCredential(t, creds, testOtherToken, testOtherActor, testOtherOwner, now, now.Add(24*time.Hour), platform.CredentialActive)
 	return &harness{
 		handler: New(Deps{
-			Store:       counted,
-			Allocator:   alloc,
-			Clock:       clock,
-			Credentials: creds,
-			Permuter:    permuter,
-			PublicBase:  publicBase,
-			Stats:       stats,
-			Invalidator: invalidator,
-			Audit:       audit,
+			Store:      counted,
+			Allocator:  alloc,
+			Clock:      clock,
+			Permuter:   permuter,
+			PublicBase: publicBase,
+			Stats:      stats,
 		}),
-		store:       store,
-		counted:     counted,
-		clock:       clock,
-		creds:       creds,
-		alloc:       alloc,
-		cache:       cache,
-		invalidator: invalidator,
-		audit:       audit,
-		stats:       stats,
-		now:         now,
+		store:   store,
+		counted: counted,
+		clock:   clock,
+		alloc:   alloc,
+		cache:   cache,
+		stats:   stats,
+		now:     now,
 	}
 }
 
-func seedCredential(t *testing.T, store *memory.CredentialStore, token, actor, owner string, issued, expires time.Time, status platform.CredentialStatus) {
-	t.Helper()
-	err := store.Store(context.Background(), token, platform.Credential{
-		ActorID: actor, OwnerID: owner, Status: status, IssuedAt: issued, ExpiresAt: expires,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+func postCreate(h http.Handler, idem, body string) *httptest.ResponseRecorder {
+	return postCreateReader(h, idem, strings.NewReader(body), int64(len(body)))
 }
 
-func postCreate(h http.Handler, apiKey, idem, body string) *httptest.ResponseRecorder {
-	return postCreateReader(h, apiKey, idem, strings.NewReader(body), int64(len(body)))
-}
-
-func postCreateReader(h http.Handler, apiKey, idem string, body io.Reader, contentLength int64) *httptest.ResponseRecorder {
+func postCreateReader(h http.Handler, idem string, body io.Reader, contentLength int64) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/links", body)
 	req.Header.Set("Content-Type", "application/json")
-	if apiKey != "" {
-		req.Header.Set("X-Api-Key", apiKey)
-	}
 	if idem != "" {
 		req.Header.Set("Idempotency-Key", idem)
 	}
@@ -140,21 +107,8 @@ func decodeCreate(t *testing.T, rec *httptest.ResponseRecorder) createResponse {
 	return body
 }
 
-func getStats(h http.Handler, apiKey, code string) *httptest.ResponseRecorder {
+func getStats(h http.Handler, code string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/links/"+code+"/stats", nil)
-	if apiKey != "" {
-		req.Header.Set("X-Api-Key", apiKey)
-	}
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, req)
-	return rec
-}
-
-func deleteLink(h http.Handler, apiKey, code string) *httptest.ResponseRecorder {
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/links/"+code, nil)
-	if apiKey != "" {
-		req.Header.Set("X-Api-Key", apiKey)
-	}
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	return rec

@@ -1,34 +1,28 @@
 import { useEffect, useState } from 'react'
-import { ApiError, deleteLink, forgetLink, getApiKey, getStats, setApiKey, type LinkStats } from '../api.ts'
+import { ApiError, forgetLink, getStats, type LinkStats } from '../api.ts'
 
 type LinkPageProps = {
   code: string
   onBack: () => void
-  onDeleted?: (code: string) => void
+  onForgotten?: (code: string) => void
 }
 
-export function LinkPage({ code, onBack, onDeleted }: LinkPageProps) {
-  const [apiKey, setApiKeyField] = useState(getApiKey)
+export function LinkPage({ code, onBack, onForgotten }: LinkPageProps) {
   const [stats, setStats] = useState<LinkStats | null>(null)
   const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    if (apiKey.trim() === '') {
-      return
-    }
-    setApiKey(apiKey)
+    setError('')
+    setStats(null)
     void (async () => {
       try {
-        const result = await getStats(code, apiKey)
+        const result = await getStats(code)
         if (!cancelled) {
           setStats(result)
-          setError('')
         }
       } catch (err) {
         if (!cancelled) {
-          setStats(null)
           setError(err instanceof ApiError ? err.message : 'Something went wrong.')
         }
       }
@@ -36,24 +30,12 @@ export function LinkPage({ code, onBack, onDeleted }: LinkPageProps) {
     return () => {
       cancelled = true
     }
-  }, [apiKey, code])
+  }, [code])
 
-  async function onDelete() {
-    if (!window.confirm(`Delete ${code}? This cannot be undone from the UI.`)) {
-      return
-    }
-    setBusy(true)
-    setApiKey(apiKey)
-    try {
-      await deleteLink(code, apiKey)
-      forgetLink(code)
-      onDeleted?.(code)
-      onBack()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Something went wrong.')
-    } finally {
-      setBusy(false)
-    }
+  function onForget() {
+    forgetLink(code)
+    onForgotten?.(code)
+    onBack()
   }
 
   return (
@@ -68,28 +50,14 @@ export function LinkPage({ code, onBack, onDeleted }: LinkPageProps) {
         </button>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium" htmlFor="api-key">
-          API key
-        </label>
-        <input
-          id="api-key"
-          type="password"
-          autoComplete="off"
-          value={apiKey}
-          onChange={(e) => setApiKeyField(e.target.value)}
-          className="flex h-9 w-full border border-input bg-background px-3.5 text-sm outline-none focus-visible:border-brand focus-visible:glow"
-        />
-      </div>
-
       {error ? (
-        <p className="mt-5 bg-destructive-soft px-3 py-2 text-sm text-destructive" role="alert">
+        <p className="bg-destructive-soft px-3 py-2 text-sm text-destructive" role="alert">
           {error}
         </p>
       ) : null}
 
       {stats ? (
-        <dl className="mt-5 border border-border">
+        <dl className="border border-border">
           <div className="flex justify-between gap-4 px-3 py-2">
             <dt className="text-sm text-muted-foreground">Clicks</dt>
             <dd className="font-mono text-sm tabular-nums">{stats.clicks}</dd>
@@ -107,12 +75,14 @@ export function LinkPage({ code, onBack, onDeleted }: LinkPageProps) {
 
       <button
         type="button"
-        disabled={busy}
-        onClick={() => void onDelete()}
-        className="mt-5 inline-flex h-9 items-center bg-destructive-soft px-3.5 text-sm font-medium text-destructive hover:bg-destructive/20 disabled:opacity-50"
+        onClick={onForget}
+        className="mt-5 inline-flex h-9 items-center border border-input px-3.5 text-sm text-muted-foreground hover:border-brand hover:text-foreground"
       >
-        {busy ? 'Deleting…' : 'Delete link'}
+        Remove from this list
       </button>
+      <p className="mt-2 text-xs text-muted-foreground">
+        This only forgets the link in this browser. The short link itself keeps working until it expires.
+      </p>
     </section>
   )
 }

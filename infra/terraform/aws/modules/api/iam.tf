@@ -63,15 +63,8 @@ resource "aws_iam_role_policy" "api" {
           var.table_arns["links"],
           var.table_arns["idempotency"],
           var.table_arns["counters"],
-          var.table_arns["credentials"],
           var.table_arns["stats"],
         ]
-      },
-      {
-        Sid      = "InvokeInvalidation"
-        Effect   = "Allow"
-        Action   = ["lambda:InvokeFunction"]
-        Resource = aws_lambda_function.invalidate.arn
       },
       {
         Effect   = "Allow"

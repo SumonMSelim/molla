@@ -38,14 +38,6 @@ output "vpc_id" {
   value = aws_vpc.this.id
 }
 
-output "usage_plan_id" {
-  value = aws_api_gateway_usage_plan.this.id
-}
-
-output "api_key_id" {
-  value = aws_api_gateway_api_key.metering.id
-}
-
 output "invalidate_function_name" {
   value = aws_lambda_function.invalidate.function_name
 }
