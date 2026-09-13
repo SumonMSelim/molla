@@ -61,12 +61,12 @@ resource "aws_s3_bucket_policy" "archive" {
 
 resource "aws_kinesis_stream" "clicks" {
   name             = "${var.name_prefix}-clicks"
-  shard_count      = var.shard_count
+  shard_count      = var.stream_mode == "PROVISIONED" ? var.shard_count : null
   encryption_type  = "KMS"
   kms_key_id       = var.kms_key_arn
   retention_period = 24
   stream_mode_details {
-    stream_mode = "PROVISIONED"
+    stream_mode = var.stream_mode
   }
   tags = var.tags
 }

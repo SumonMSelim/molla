@@ -19,10 +19,20 @@ variable "stats_table_name" {
   type = string
 }
 
+variable "stream_mode" {
+  type        = string
+  description = "Kinesis capacity mode. ON_DEMAND bills per use with no idle shard-hour cost (cheapest at low/unknown volume); PROVISIONED needs shard_count sized for tested peak."
+  default     = "ON_DEMAND"
+  validation {
+    condition     = contains(["ON_DEMAND", "PROVISIONED"], var.stream_mode)
+    error_message = "stream_mode must be ON_DEMAND or PROVISIONED."
+  }
+}
+
 variable "shard_count" {
   type        = number
-  description = "Kinesis shards. Prod sizes ~16 with 20% headroom over tested peak."
-  default     = 2
+  description = "Kinesis shards. Only used when stream_mode is PROVISIONED; prod sizes ~16 with 20% headroom over tested peak."
+  default     = 1
 }
 
 variable "log_retention_days" {

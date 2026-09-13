@@ -37,15 +37,12 @@ locals {
     CostCenter     = "molla"
     CostAllocation = "prod"
   }
-  # Quota headroom ≥20% above DESIGN.md tested peak (15,432 redirect QPS, 154 write QPS, 160 redirect concurrency).
-  quota_headroom = {
-    lambda_redirect_provisioned = 192
-    kinesis_shards              = 20
-    api_gateway_stage_rate      = 185
-    api_gateway_stage_burst     = 370
-    dynamodb_on_demand          = "adaptive"
-    vpc_interface_endpoints     = 2
-  }
+  # This deploy runs at hobby/learning scale, not DESIGN.md's tested load
+  # targets (15,432 redirect QPS, 154 write QPS). Every module default is
+  # already sized for near-zero cost (on-demand billing, smallest instance
+  # sizes, no provisioned concurrency); nothing here overrides them upward.
+  # Revisit quota_headroom in DESIGN.md if real traffic ever approaches
+  # those numbers.
   account_controls = {
     cloudtrail      = var.central_cloudtrail_arn
     config          = var.central_config_recorder_arn
@@ -82,7 +79,7 @@ resource "aws_sns_topic_subscription" "email" {
 module "data" {
   source        = "../../modules/data"
   name_prefix   = local.name_prefix
-  enable_pitr   = true
+  enable_pitr   = false # hobby scale: skip continuous backup cost, not worth it for this data
   kms_key_arn   = aws_kms_key.this.arn
   alarm_actions = [aws_sns_topic.alarms.arn]
   tags          = local.tags
@@ -95,30 +92,25 @@ module "analytics" {
   artifact_dir     = var.artifact_dir
   stats_table_arn  = module.data.table_arns["stats"]
   stats_table_name = module.data.stats_table_name
-  shard_count      = local.quota_headroom.kinesis_shards
   alarm_actions    = [aws_sns_topic.alarms.arn]
   tags             = local.tags
 }
 
 module "api" {
-  source                  = "../../modules/api"
-  name_prefix             = local.name_prefix
-  kms_key_arn             = aws_kms_key.this.arn
-  artifact_dir            = var.artifact_dir
-  table_arns              = module.data.table_arns
-  table_names             = module.data.table_names
-  stream_arn              = module.analytics.stream_arn
-  stream_name             = module.analytics.stream_name
-  redis_node_type         = "cache.r7g.large"
-  redis_auth_token        = local.redis_auth_token
-  permutation_key         = local.permutation_key
-  privacy_key             = local.privacy_key
-  provisioned_concurrency = local.quota_headroom.lambda_redirect_provisioned
-  throttle_rate_limit     = local.quota_headroom.api_gateway_stage_rate
-  throttle_burst_limit    = local.quota_headroom.api_gateway_stage_burst
-  admin_principal_arns    = var.admin_principal_arns
-  alarm_actions           = [aws_sns_topic.alarms.arn]
-  tags                    = local.tags
+  source               = "../../modules/api"
+  name_prefix          = local.name_prefix
+  kms_key_arn          = aws_kms_key.this.arn
+  artifact_dir         = var.artifact_dir
+  table_arns           = module.data.table_arns
+  table_names          = module.data.table_names
+  stream_arn           = module.analytics.stream_arn
+  stream_name          = module.analytics.stream_name
+  redis_auth_token     = local.redis_auth_token
+  permutation_key      = local.permutation_key
+  privacy_key          = local.privacy_key
+  admin_principal_arns = var.admin_principal_arns
+  alarm_actions        = [aws_sns_topic.alarms.arn]
+  tags                 = local.tags
 }
 
 module "ci" {
@@ -175,7 +167,7 @@ resource "aws_cloudwatch_dashboard" "workload" {
             "- GuardDuty: ${local.account_controls.guardduty}",
             "- Security Hub: ${local.account_controls.security_hub}",
             "- Access Analyzer: ${local.account_controls.access_analyzer}",
-            "- Quota headroom: provisioned concurrency ${local.quota_headroom.lambda_redirect_provisioned}, Kinesis shards ${local.quota_headroom.kinesis_shards} (≥20% above 15,432 QPS / 160 concurrent).",
+            "- Sizing: hobby/learning scale, not DESIGN.md's tested load targets. No provisioned Lambda concurrency, on-demand Kinesis, single-node Redis, PITR off.",
           ])
         }
       }

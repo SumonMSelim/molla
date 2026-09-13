@@ -37,6 +37,12 @@ variable "redis_node_type" {
   default = "cache.t4g.micro"
 }
 
+variable "redis_cluster_count" {
+  type        = number
+  description = "ElastiCache nodes. 1 = no replica/failover (cheapest); 2+ enables automatic_failover_enabled and multi_az_enabled."
+  default     = 1
+}
+
 variable "redis_auth_token" {
   type      = string
   sensitive = true
@@ -59,8 +65,8 @@ variable "public_base" {
 
 variable "provisioned_concurrency" {
   type        = number
-  description = "Redirect alias provisioned concurrency. Prod: 192 (160 peak * 1.2)."
-  default     = 1
+  description = "Redirect alias provisioned concurrency. 0 disables it entirely (cold starts, no idle cost); size for tested peak (e.g. 160 * 1.2) once real traffic exists."
+  default     = 0
 }
 
 variable "throttle_rate_limit" {
