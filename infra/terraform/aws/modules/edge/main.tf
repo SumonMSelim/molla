@@ -134,7 +134,31 @@ resource "aws_cloudfront_function" "viewer_request" {
   code    = templatefile("${path.module}/viewer_request.js.tftpl", { secret = var.origin_verify_secret })
 }
 
+# One viewer-request function per behavior is allowed, and /app/* needs both the
+# Cloudflare origin check and the SPA rewrite, so they are combined here.
+resource "aws_cloudfront_function" "spa_rewrite" {
+  name    = "${var.name_prefix}-spa-rewrite"
+  runtime = "cloudfront-js-2.0"
+  comment = "Serve the SPA shell for /app deep links."
+  publish = true
+  code = templatefile("${path.module}/spa_rewrite.js.tftpl", {
+    verify = var.domain_name == "" ? "" : local.origin_verify_js
+  })
+}
+
 locals {
+  origin_verify_js = <<-EOT
+      var header = request.headers['x-origin-verify'];
+      if (!header || header.value !== '${var.origin_verify_secret}') {
+        return {
+          statusCode: 403,
+          statusDescription: 'Forbidden',
+          headers: { 'cache-control': { value: 'no-store' } }
+        };
+      }
+      delete request.headers['x-origin-verify'];
+  EOT
+
   redirect_domain = replace(replace(var.redirect_function_url, "https://", ""), "/", "")
   api_domain      = "${var.api_gateway_id}.execute-api.${data.aws_region.current.region}.amazonaws.com"
 }
@@ -223,12 +247,9 @@ resource "aws_cloudfront_distribution" "this" {
     compress                   = true
     cache_policy_id            = aws_cloudfront_cache_policy.redirect.id
     response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
-    dynamic "function_association" {
-      for_each = aws_cloudfront_function.viewer_request
-      content {
-        event_type   = "viewer-request"
-        function_arn = function_association.value.arn
-      }
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.spa_rewrite.arn
     }
   }
 
@@ -248,6 +269,7 @@ resource "aws_lambda_permission" "cloudfront_redirect" {
   statement_id  = "AllowCloudFrontOAC"
   action        = "lambda:InvokeFunctionUrl"
   function_name = var.redirect_function_arn
+  qualifier     = "live"
   principal     = "cloudfront.amazonaws.com"
   source_arn    = aws_cloudfront_distribution.this.arn
 }

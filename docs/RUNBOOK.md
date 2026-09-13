@@ -20,7 +20,7 @@ Load tests run only from an operator workstation against **dev** or a dedicated 
 4. `terraform init` and reviewed `terraform plan` in `envs/dev`, then `apply` only with short-lived credentials and explicit approval.
 5. ACM + DNS: set `domain_name` (`mol.la`) and `cloudflare_zone_id` in tfvars and export `CLOUDFLARE_API_TOKEN` (scopes: Zone:DNS:Edit, Zone:Zone Settings:Edit, Zone:Transform Rules:Edit on the mol.la zone). Terraform creates the ACM validation records, the proxied apex CNAME to CloudFront, sets SSL to Full (strict), and a Transform Rule that stamps `X-Origin-Verify`. Empty `domain_name` keeps the CloudFront hostname with no origin check. Cloudflare WAF/rate limiting is the firewall; there is no AWS WAF.
 6. Seed the first developer key (below).
-7. `make web-build` and `aws s3 sync web/dist s3://$(terraform output -raw ui_bucket) --delete`. Invalidate CloudFront `/app/*`.
+7. `make web-build` and `aws s3 sync web/dist s3://$(terraform output -raw ui_bucket)/app --delete`. Invalidate CloudFront `/app/*`.
 8. Confirm `GET https://mol.la/app/` and `POST /api/v1/links` with both the API Gateway key and `X-Api-Key`. Confirm `GET https://<distribution>.cloudfront.net/` returns 403 (Cloudflare bypass blocked).
 
 ## Rotate the origin secret

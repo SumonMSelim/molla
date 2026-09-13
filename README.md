@@ -71,7 +71,7 @@ From `infra/terraform/aws/envs/dev` (or `prod`): configure the S3 backend, suppl
 After apply:
 
 1. Seed DynamoDB credentials and the matching API Gateway key — `go run ./cmd/admin issue` (see `docs/RUNBOOK.md`).
-2. `aws s3 sync web/dist s3://$(terraform output -raw ui_bucket) --delete`
+2. `aws s3 sync web/dist s3://$(terraform output -raw ui_bucket)/app --delete`
 3. Invalidate CloudFront `/app/*`
 4. DNS is applied by Terraform: mol.la is a proxied Cloudflare CNAME to the distribution. Cloudflare is the firewall; CloudFront only accepts requests carrying the Cloudflare-stamped `X-Origin-Verify` header.
 

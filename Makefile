@@ -3,6 +3,7 @@
 GO_IMAGE   ?= golang:1.27.1
 NODE_IMAGE ?= node:24-alpine
 TF_IMAGE   ?= hashicorp/terraform:1.16.2
+AWS_IMAGE  ?= amazon/aws-cli:2.32.9
 TF_DIR     := infra/terraform/aws
 
 DOCKER_GO = docker run --rm -v "$(CURDIR)":/src -w /src \
@@ -13,8 +14,10 @@ GO    ?= $(DOCKER_GO) go
 GOFMT ?= $(DOCKER_GO) gofmt
 NPM   ?= $(DOCKER_NPM)
 TF    ?= docker run --rm -v "$(CURDIR)/$(TF_DIR)":/w -w /w $(TF_IMAGE)
+AWS   ?= docker run --rm -v "$(CURDIR)":/src -w /src \
+	-v "$(HOME)/.aws":/root/.aws:ro -e AWS_PROFILE -e AWS_REGION $(AWS_IMAGE)
 
-.PHONY: build test coverage vet lint bench tf-check build-lambda web-build web-lint web-test dev-api
+.PHONY: build test coverage vet lint bench tf-check build-lambda web-build web-lint web-test dev-api deploy-web
 
 build:
 	$(GO) build ./...
@@ -55,6 +58,11 @@ web-test:
 
 web-build:
 	cd web && $(NPM) ci && $(NPM) run build
+
+# Requires UI_BUCKET and DIST_ID; AWS credentials come from the host environment.
+deploy-web:
+	$(AWS) s3 sync web/dist "s3://$(UI_BUCKET)/app" --delete
+	$(AWS) cloudfront create-invalidation --distribution-id "$(DIST_ID)" --paths '/app/*'
 
 dev-api:
 	docker run --rm -p 8080:8080 -v "$(CURDIR)":/src -w /src \
