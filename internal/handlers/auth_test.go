@@ -66,6 +66,9 @@ func TestAuthenticateDependencyFailure(t *testing.T) {
 		Clock:       memory.NewClock(now),
 		Credentials: &credentialStub{err: platform.ErrDependency},
 		Permuter:    permuter,
+		Stats:       memory.NewStatsStore(),
+		Invalidator: memory.NewCacheInvalidator(memory.NewCache()),
+		Audit:       &memory.AuditSink{},
 	})
 	rec := postCreate(h, "any-token", "", `{"long_url":"https://example.com"}`)
 	if rec.Code != http.StatusServiceUnavailable || decodeError(t, rec) != "TEMPORARILY_UNAVAILABLE" {
