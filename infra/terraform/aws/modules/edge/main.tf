@@ -266,6 +266,25 @@ resource "aws_cloudfront_distribution" "this" {
     }
   }
 
+  # Root path serves the landing page (create-a-link UI), not the redirect
+  # Lambda; any other bare path (a real or unknown short code) still falls
+  # through to the default behavior. spa_rewrite treats "/" the same as any
+  # other extensionless path and rewrites it to /app/index.html.
+  ordered_cache_behavior {
+    path_pattern               = "/"
+    target_origin_id           = "ui"
+    viewer_protocol_policy     = "redirect-to-https"
+    allowed_methods            = ["GET", "HEAD"]
+    cached_methods             = ["GET", "HEAD"]
+    compress                   = true
+    cache_policy_id            = aws_cloudfront_cache_policy.redirect.id
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.spa_rewrite.arn
+    }
+  }
+
   restrictions {
     geo_restriction { restriction_type = "none" }
   }
