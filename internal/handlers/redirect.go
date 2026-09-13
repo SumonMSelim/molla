@@ -212,6 +212,12 @@ func hashSourceIP(key []byte, ip string, now time.Time) string {
 }
 
 func requestIP(r *http.Request) string {
+	// mol.la is proxied through Cloudflare, which sets this to the real client
+	// IP on every request it forwards; unlike X-Forwarded-For it cannot be
+	// spoofed by the client (Cloudflare overwrites any client-sent value).
+	if cf := strings.TrimSpace(r.Header.Get("CF-Connecting-IP")); cf != "" {
+		return cf
+	}
 	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
 		if i := strings.IndexByte(forwarded, ','); i >= 0 {
 			forwarded = forwarded[:i]

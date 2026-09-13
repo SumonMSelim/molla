@@ -461,6 +461,19 @@ func TestRequestIPWithoutPort(t *testing.T) {
 	}
 }
 
+func TestRequestIPPrefersCloudflareHeader(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/x", nil)
+	req.RemoteAddr = "192.0.2.1"
+	// Cloudflare overwrites any client-sent value, so it takes precedence over
+	// the spoofable X-Forwarded-For a caller could set directly against
+	// CloudFront.
+	req.Header.Set("X-Forwarded-For", "203.0.113.1")
+	req.Header.Set("CF-Connecting-IP", "198.51.100.9")
+	if got := requestIP(req); got != "198.51.100.9" {
+		t.Fatalf("ip = %q", got)
+	}
+}
+
 func TestNewEventID(t *testing.T) {
 	if id := newEventID(); len(id) != 32 {
 		t.Fatalf("event id length = %d", len(id))

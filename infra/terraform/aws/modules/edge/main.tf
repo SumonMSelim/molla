@@ -96,6 +96,18 @@ resource "aws_cloudfront_cache_policy" "api" {
   }
 }
 
+# Forwarded to the origin but excluded from the cache key: forwarding it via
+# the cache policy instead would fragment the 5s redirect cache per client IP.
+resource "aws_cloudfront_origin_request_policy" "redirect" {
+  name = "${var.name_prefix}-redirect-origin"
+  cookies_config { cookie_behavior = "none" }
+  headers_config {
+    header_behavior = "whitelist"
+    headers { items = ["CF-Connecting-IP"] }
+  }
+  query_strings_config { query_string_behavior = "none" }
+}
+
 resource "aws_cloudfront_origin_request_policy" "api" {
   name = "${var.name_prefix}-api-origin"
   cookies_config { cookie_behavior = "none" }
@@ -209,6 +221,7 @@ resource "aws_cloudfront_distribution" "this" {
     cached_methods             = ["GET", "HEAD"]
     compress                   = true
     cache_policy_id            = aws_cloudfront_cache_policy.redirect.id
+    origin_request_policy_id   = aws_cloudfront_origin_request_policy.redirect.id
     response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
     dynamic "function_association" {
       for_each = aws_cloudfront_function.viewer_request
