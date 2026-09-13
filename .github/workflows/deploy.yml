@@ -1,0 +1,82 @@
+name: Deploy
+
+# Applies infra/terraform/aws/envs/prod and ships Lambda + web artifacts.
+# Never runs on a merge to main: only a v* tag push or an explicit manual
+# dispatch, both gated by the production environment's required reviewer.
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy" to confirm applying infra/terraform/aws/envs/prod'
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  TF_DIR: infra/terraform/aws/envs/prod
+
+jobs:
+  deploy:
+    if: github.event_name == 'push' || github.event.inputs.confirm == 'deploy'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27"
+          cache: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.16.2"
+
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Build Lambda zips
+        run: make build-lambda GO=go
+
+      - name: Build web app
+        run: make web-build NPM=npm
+
+      - name: Terraform init
+        working-directory: ${{ env.TF_DIR }}
+        run: terraform init -input=false
+
+      - name: Terraform apply
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          terraform apply -auto-approve -input=false \
+            -var "artifact_dir=${{ github.workspace }}/dist" \
+            -var 'admin_principal_arns=${{ vars.ADMIN_PRINCIPAL_ARNS }}' \
+            -var "alarm_email=${{ vars.ALARM_EMAIL }}" \
+            -var "domain_name=${{ vars.DOMAIN_NAME }}" \
+            -var "cloudflare_zone_id=${{ vars.CLOUDFLARE_ZONE_ID }}" \
+            -var "github_repository=${{ github.repository }}"
+
+      - name: Sync web app and invalidate cache
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          UI_BUCKET="$(terraform output -raw ui_bucket)"
+          DIST_ID="$(terraform output -raw distribution_id)"
+          aws s3 sync "${{ github.workspace }}/web/dist" "s3://$UI_BUCKET/app" --delete
+          aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths '/app/*'

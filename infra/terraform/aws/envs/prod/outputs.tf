@@ -33,3 +33,13 @@ output "invalidate_function_name" {
 output "invalidate_function_arn" {
   value = module.api.invalidate_function_arn
 }
+
+output "gha_plan_role_arn" {
+  description = "Set as the AWS_PLAN_ROLE_ARN GitHub Actions variable."
+  value       = module.ci.plan_role_arn
+}
+
+output "gha_apply_role_arn" {
+  description = "Set as the AWS_APPLY_ROLE_ARN GitHub Actions variable."
+  value       = module.ci.apply_role_arn
+}

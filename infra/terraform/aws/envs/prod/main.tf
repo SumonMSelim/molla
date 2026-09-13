@@ -1,5 +1,35 @@
+resource "random_password" "permutation_key" {
+  count   = var.permutation_key == "" ? 1 : 0
+  length  = 32
+  special = false
+}
+
+resource "random_password" "privacy_key" {
+  count   = var.privacy_key == "" ? 1 : 0
+  length  = 32
+  special = false
+}
+
+resource "random_password" "redis_auth_token" {
+  count   = var.redis_auth_token == "" ? 1 : 0
+  length  = 32
+  special = false
+}
+
+resource "random_password" "origin_verify_secret" {
+  count   = var.domain_name != "" && var.origin_verify_secret == "" ? 1 : 0
+  length  = 32
+  special = false
+}
+
 locals {
-  name_prefix = "molla-prod"
+  # Generated on first apply and then stable: an unset input keeps resolving
+  # to the same random_password resource rather than a new value each plan.
+  permutation_key      = var.permutation_key != "" ? var.permutation_key : one(random_password.permutation_key[*].result)
+  privacy_key          = var.privacy_key != "" ? var.privacy_key : one(random_password.privacy_key[*].result)
+  redis_auth_token     = var.redis_auth_token != "" ? var.redis_auth_token : one(random_password.redis_auth_token[*].result)
+  origin_verify_secret = var.origin_verify_secret != "" ? var.origin_verify_secret : try(one(random_password.origin_verify_secret[*].result), "")
+  name_prefix          = "molla-prod"
   tags = {
     Workload       = "molla"
     Environment    = "prod"
@@ -80,15 +110,22 @@ module "api" {
   stream_arn              = module.analytics.stream_arn
   stream_name             = module.analytics.stream_name
   redis_node_type         = "cache.r7g.large"
-  redis_auth_token        = var.redis_auth_token
-  permutation_key         = var.permutation_key
-  privacy_key             = var.privacy_key
+  redis_auth_token        = local.redis_auth_token
+  permutation_key         = local.permutation_key
+  privacy_key             = local.privacy_key
   provisioned_concurrency = local.quota_headroom.lambda_redirect_provisioned
   throttle_rate_limit     = local.quota_headroom.api_gateway_stage_rate
   throttle_burst_limit    = local.quota_headroom.api_gateway_stage_burst
   admin_principal_arns    = var.admin_principal_arns
   alarm_actions           = [aws_sns_topic.alarms.arn]
   tags                    = local.tags
+}
+
+module "ci" {
+  source            = "../../modules/ci"
+  name_prefix       = local.name_prefix
+  github_repository = var.github_repository
+  tags              = local.tags
 }
 
 module "edge" {
@@ -100,7 +137,7 @@ module "edge" {
   redirect_function_arn = module.api.redirect_function_arn
   domain_name           = var.domain_name
   cloudflare_zone_id    = var.cloudflare_zone_id
-  origin_verify_secret  = var.origin_verify_secret
+  origin_verify_secret  = local.origin_verify_secret
   alarm_actions         = [aws_sns_topic.alarms.arn]
   tags                  = local.tags
 }
