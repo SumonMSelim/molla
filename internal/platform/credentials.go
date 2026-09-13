@@ -26,10 +26,13 @@ type Credential struct {
 	ExpiresAt time.Time
 }
 
-// CredentialStore provisions and resolves developer tokens.
+// CredentialStore provisions, resolves, and revokes developer tokens.
 type CredentialStore interface {
 	Store(context.Context, string, Credential) error
 	Resolve(context.Context, string, time.Time) (Principal, error)
+	// Revoke marks the credential with the given token hash revoked. It returns
+	// ErrNotFound when no credential holds that hash.
+	Revoke(context.Context, string) error
 }
 
 // HashToken returns the SHA-256 hex digest of a raw developer token.

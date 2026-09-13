@@ -481,3 +481,5 @@ func (c *credentialStub) Resolve(context.Context, string, time.Time) (platform.P
 	}
 	return c.principal, nil
 }
+
+func (c *credentialStub) Revoke(context.Context, string) error { return c.err }

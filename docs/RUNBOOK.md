@@ -48,7 +48,14 @@ go run ./cmd/admin issue --owner OWNER --days 90
 # stdout prints the raw token once. Create API key with that value; associate with the usage plan.
 ```
 
-Revoke the previous DynamoDB item (status revoked / delete row) only after clients use the new token. Disable the old API Gateway key.
+Revoke the old key only after clients use the new token, then disable the old API Gateway key.
+
+```sh
+# token_hash is the SHA-256 of the old raw token (DynamoDB stores only the hash).
+go run ./cmd/admin revoke --token-hash "$(printf %s "$OLD_TOKEN" | shasum -a 256 | cut -d" " -f1)"
+```
+
+Revoking an unknown hash fails with a not-found error and changes nothing. Audit JSON on stderr.
 
 ## Takedown
 
@@ -57,7 +64,7 @@ export MOLLA_INVALIDATE_FUNCTION=$(terraform output -raw invalidate_function_nam
 go run ./cmd/admin takedown --code SHORTCODE --reason malware
 ```
 
-Actor comes from STS unless `--actor` is set. Soft-delete + Redis tombstone. Audit JSON on stderr.
+Actor always comes from STS caller identity; it cannot be overridden. Soft-delete + Redis tombstone. Audit JSON on stderr.
 
 ## Restore
 
