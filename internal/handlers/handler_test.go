@@ -37,13 +37,17 @@ func (s *countingStore) Create(ctx context.Context, link platform.Link, idem *pl
 }
 
 type harness struct {
-	handler http.Handler
-	store   *memory.LinkStore
-	counted *countingStore
-	clock   *memory.Clock
-	creds   *memory.CredentialStore
-	alloc   *memory.IDAllocator
-	now     time.Time
+	handler     http.Handler
+	store       *memory.LinkStore
+	counted     *countingStore
+	clock       *memory.Clock
+	creds       *memory.CredentialStore
+	alloc       *memory.IDAllocator
+	cache       *memory.Cache
+	invalidator *memory.CacheInvalidator
+	audit       *memory.AuditSink
+	stats       *memory.StatsStore
+	now         time.Time
 }
 
 func newHarness(t *testing.T, publicBase string) *harness {
@@ -54,6 +58,10 @@ func newHarness(t *testing.T, publicBase string) *harness {
 	clock := memory.NewClock(now)
 	creds := memory.NewCredentialStore()
 	alloc := memory.NewIDAllocator(0)
+	cache := memory.NewCache()
+	invalidator := memory.NewCacheInvalidator(cache)
+	audit := &memory.AuditSink{}
+	stats := memory.NewStatsStore()
 	permuter, err := core.NewPermuter([]byte(testPermuteKey))
 	if err != nil {
 		t.Fatal(err)
@@ -68,13 +76,20 @@ func newHarness(t *testing.T, publicBase string) *harness {
 			Credentials: creds,
 			Permuter:    permuter,
 			PublicBase:  publicBase,
+			Stats:       stats,
+			Invalidator: invalidator,
+			Audit:       audit,
 		}),
-		store:   store,
-		counted: counted,
-		clock:   clock,
-		creds:   creds,
-		alloc:   alloc,
-		now:     now,
+		store:       store,
+		counted:     counted,
+		clock:       clock,
+		creds:       creds,
+		alloc:       alloc,
+		cache:       cache,
+		invalidator: invalidator,
+		audit:       audit,
+		stats:       stats,
+		now:         now,
 	}
 }
 
@@ -121,6 +136,35 @@ func decodeCreate(t *testing.T, rec *httptest.ResponseRecorder) createResponse {
 	var body createResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode create body: %v (%s)", err, rec.Body.String())
+	}
+	return body
+}
+
+func getStats(h http.Handler, apiKey, code string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/links/"+code+"/stats", nil)
+	if apiKey != "" {
+		req.Header.Set("X-Api-Key", apiKey)
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+func deleteLink(h http.Handler, apiKey, code string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/links/"+code, nil)
+	if apiKey != "" {
+		req.Header.Set("X-Api-Key", apiKey)
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+func decodeStats(t *testing.T, rec *httptest.ResponseRecorder) statsResponse {
+	t.Helper()
+	var body statsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode stats body: %v (%s)", err, rec.Body.String())
 	}
 	return body
 }

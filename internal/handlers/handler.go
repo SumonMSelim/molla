@@ -31,6 +31,9 @@ type Deps struct {
 	Credentials platform.CredentialStore
 	Permuter    *core.Permuter
 	PublicBase  string
+	Stats       platform.StatsStore
+	Invalidator platform.CacheInvalidator
+	Audit       platform.AuditSink
 }
 
 type API struct {
@@ -40,6 +43,8 @@ type API struct {
 	credentials platform.CredentialStore
 	permuter    *core.Permuter
 	publicBase  string
+	statsStore  platform.StatsStore
+	deleter     Deleter
 }
 
 // New returns the authenticated API mux.
@@ -55,9 +60,18 @@ func New(deps Deps) http.Handler {
 		credentials: deps.Credentials,
 		permuter:    deps.Permuter,
 		publicBase:  base,
+		statsStore:  deps.Stats,
+		deleter: Deleter{
+			Store:       deps.Store,
+			Invalidator: deps.Invalidator,
+			Audit:       deps.Audit,
+			Clock:       deps.Clock,
+		},
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/links", api.create)
+	mux.HandleFunc("GET /api/v1/links/{short_code}/stats", api.stats)
+	mux.HandleFunc("DELETE /api/v1/links/{short_code}", api.delete)
 	return api.authenticate(mux)
 }
 

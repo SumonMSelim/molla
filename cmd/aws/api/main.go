@@ -26,6 +26,7 @@ func newHandler() (http.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
+	cache := memory.NewCache()
 	return handlers.New(handlers.Deps{
 		Store:       memory.NewLinkStore(),
 		Allocator:   memory.NewIDAllocator(0),
@@ -33,6 +34,9 @@ func newHandler() (http.Handler, error) {
 		Credentials: memory.NewCredentialStore(),
 		Permuter:    permuter,
 		PublicBase:  os.Getenv("MOLLA_PUBLIC_BASE"),
+		Stats:       memory.NewStatsStore(),
+		Invalidator: memory.NewCacheInvalidator(cache),
+		Audit:       &memory.AuditSink{},
 	}), nil
 }
 
