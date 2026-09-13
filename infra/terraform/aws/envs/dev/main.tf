@@ -41,21 +41,20 @@ module "analytics" {
 }
 
 module "api" {
-  source                  = "../../modules/api"
-  name_prefix             = local.name_prefix
-  kms_key_arn             = aws_kms_key.this.arn
-  artifact_dir            = var.artifact_dir
-  table_arns              = module.data.table_arns
-  table_names             = module.data.table_names
-  stream_arn              = module.analytics.stream_arn
-  stream_name             = module.analytics.stream_name
-  redis_node_type         = "cache.t4g.micro"
-  redis_auth_token        = var.redis_auth_token
-  permutation_key         = var.permutation_key
-  privacy_key             = var.privacy_key
-  provisioned_concurrency = 1
-  admin_principal_arns    = var.admin_principal_arns
-  tags                    = local.tags
+  source               = "../../modules/api"
+  name_prefix          = local.name_prefix
+  kms_key_arn          = aws_kms_key.this.arn
+  artifact_dir         = var.artifact_dir
+  table_arns           = module.data.table_arns
+  table_names          = module.data.table_names
+  stream_arn           = module.analytics.stream_arn
+  stream_name          = module.analytics.stream_name
+  redis_node_type      = "cache.t4g.micro"
+  redis_auth_token     = var.redis_auth_token
+  permutation_key      = var.permutation_key
+  privacy_key          = var.privacy_key
+  admin_principal_arns = var.admin_principal_arns
+  tags                 = local.tags
 }
 
 module "edge" {

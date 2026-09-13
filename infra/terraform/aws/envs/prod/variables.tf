@@ -34,8 +34,9 @@ variable "artifact_dir" {
 }
 
 variable "budget_limit" {
-  type    = string
-  default = "20000"
+  type        = string
+  description = "Monthly USD budget. Alarms at 80% via alarm_email. Sized for hobby/learning scale, not production load."
+  default     = "20"
 }
 
 variable "alarm_email" {

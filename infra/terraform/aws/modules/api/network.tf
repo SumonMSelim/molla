@@ -102,9 +102,9 @@ resource "aws_elasticache_replication_group" "redis" {
   engine                     = "redis"
   engine_version             = "7.1"
   node_type                  = var.redis_node_type
-  num_cache_clusters         = 2
-  automatic_failover_enabled = true
-  multi_az_enabled           = true
+  num_cache_clusters         = var.redis_cluster_count
+  automatic_failover_enabled = var.redis_cluster_count > 1
+  multi_az_enabled           = var.redis_cluster_count > 1
   at_rest_encryption_enabled = true
   transit_encryption_enabled = true
   kms_key_id                 = var.kms_key_arn
