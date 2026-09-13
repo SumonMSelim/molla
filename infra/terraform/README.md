@@ -16,7 +16,7 @@ make build-lambda
 
 Writes `dist/*.zip` (`provided.al2023` / arm64). Environment roots default `artifact_dir` to checked-in placeholders so `validate` works without a build; deploy pipelines pass `dist`.
 
-Outputs from `envs/dev` and `envs/prod` include `ui_bucket`, `distribution_id`, `api_invoke_url`, `usage_plan_id`, `api_key_id`, and `admin_role_arn`.
+Outputs from `envs/dev` and `envs/prod` include `ui_bucket`, `distribution_id`, `api_invoke_url`, and `admin_role_arn`.
 
 Apply, key seeding, UI sync, takedown, restore, and regional failure: `docs/RUNBOOK.md`.
 

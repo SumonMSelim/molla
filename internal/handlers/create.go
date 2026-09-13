@@ -35,12 +35,6 @@ type createResponse struct {
 }
 
 func (a *API) create(w http.ResponseWriter, r *http.Request) {
-	principal, ok := PrincipalFromContext(r.Context())
-	if !ok {
-		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED")
-		return
-	}
-
 	if r.ContentLength > maxCreateBody {
 		writeError(w, http.StatusBadRequest, "INVALID_REQUEST")
 		return
@@ -81,7 +75,6 @@ func (a *API) create(w http.ResponseWriter, r *http.Request) {
 	now := a.clock.Now().UTC().Truncate(time.Second)
 	link := platform.Link{
 		LongURL:   req.LongURL,
-		OwnerID:   principal.OwnerID,
 		IsCustom:  req.Alias != "",
 		CreatedAt: now,
 		ExpiresAt: now.Add(time.Duration(expiresIn) * time.Second),
@@ -90,7 +83,7 @@ func (a *API) create(w http.ResponseWriter, r *http.Request) {
 	created, err := a.persist(r.Context(), link, req.Alias, idem)
 	if err != nil {
 		if errors.Is(err, platform.ErrDependency) {
-			logging.FromContext(r.Context()).Error("link create failed", "owner_id", principal.OwnerID, "custom_alias", req.Alias != "", "error", err)
+			logging.FromContext(r.Context()).Error("link create failed", "custom_alias", req.Alias != "", "error", err)
 		}
 		writeCreateError(w, err, req.Alias != "")
 		return

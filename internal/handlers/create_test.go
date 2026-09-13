@@ -18,7 +18,7 @@ import (
 
 func TestCreateGeneratedCodeAndDefaultExpiry(t *testing.T) {
 	h := newHarness(t, "")
-	rec := postCreate(h.handler, testAPIToken, "", `{"long_url":"https://example.com/very/long/path"}`)
+	rec := postCreate(h.handler, "", `{"long_url":"https://example.com/very/long/path"}`)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
 	}
@@ -53,7 +53,7 @@ func TestCreateGeneratedCodeAndDefaultExpiry(t *testing.T) {
 
 func TestCreateCustomAliasAndPublicBaseTrim(t *testing.T) {
 	h := newHarness(t, "https://mol.la/")
-	rec := postCreate(h.handler, testAPIToken, "", `{"long_url":"https://example.com","alias":"my-link","expires_in":60}`)
+	rec := postCreate(h.handler, "", `{"long_url":"https://example.com","alias":"my-link","expires_in":60}`)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
 	}
@@ -62,17 +62,17 @@ func TestCreateCustomAliasAndPublicBaseTrim(t *testing.T) {
 		t.Fatalf("response = %+v", got)
 	}
 	stored, err := h.store.Get(context.Background(), "my-link")
-	if err != nil || !stored.IsCustom || stored.OwnerID != testOwner {
+	if err != nil || !stored.IsCustom {
 		t.Fatalf("stored = %+v, err = %v", stored, err)
 	}
 }
 
 func TestCreateAliasTaken(t *testing.T) {
 	h := newHarness(t, "")
-	if rec := postCreate(h.handler, testAPIToken, "", `{"long_url":"https://example.com","alias":"taken"}`); rec.Code != http.StatusCreated {
+	if rec := postCreate(h.handler, "", `{"long_url":"https://example.com","alias":"taken"}`); rec.Code != http.StatusCreated {
 		t.Fatalf("seed status = %d", rec.Code)
 	}
-	rec := postCreate(h.handler, testOtherToken, "", `{"long_url":"https://example.com/other","alias":"taken"}`)
+	rec := postCreate(h.handler, "", `{"long_url":"https://example.com/other","alias":"taken"}`)
 	if rec.Code != http.StatusConflict || decodeError(t, rec) != "ALIAS_TAKEN" {
 		t.Fatalf("status/body = %d %s", rec.Code, rec.Body.String())
 	}
@@ -80,7 +80,7 @@ func TestCreateAliasTaken(t *testing.T) {
 
 func TestCreateRejectsInvalidURLWithoutStoreWrite(t *testing.T) {
 	h := newHarness(t, "")
-	rec := postCreate(h.handler, testAPIToken, "", `{"long_url":"javascript:alert(1)"}`)
+	rec := postCreate(h.handler, "", `{"long_url":"javascript:alert(1)"}`)
 	if rec.Code != http.StatusBadRequest || decodeError(t, rec) != "INVALID_URL" {
 		t.Fatalf("status/body = %d %s", rec.Code, rec.Body.String())
 	}
@@ -105,7 +105,7 @@ func TestCreateExpiryBounds(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			body := `{"long_url":"https://example.com","alias":"` + strings.ReplaceAll(test.name, " ", "-") + `","expires_in":` + test.expiresIn + `}`
-			rec := postCreate(h.handler, testAPIToken, "", body)
+			rec := postCreate(h.handler, "", body)
 			if rec.Code != test.wantStatus {
 				t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
 			}
@@ -118,7 +118,7 @@ func TestCreateExpiryBounds(t *testing.T) {
 
 func TestCreateRejectsOversizedBodyWithoutReading(t *testing.T) {
 	h := newHarness(t, "")
-	rec := postCreateReader(h.handler, testAPIToken, "", failReader{t: t}, maxCreateBody+1)
+	rec := postCreateReader(h.handler, "", failReader{t: t}, maxCreateBody+1)
 	if rec.Code != http.StatusBadRequest || decodeError(t, rec) != "INVALID_REQUEST" {
 		t.Fatalf("status/body = %d %s", rec.Code, rec.Body.String())
 	}
@@ -130,7 +130,7 @@ func TestCreateRejectsOversizedBodyWithoutReading(t *testing.T) {
 func TestCreateRejectsOversizedUnknownLengthBody(t *testing.T) {
 	h := newHarness(t, "")
 	body := strings.Repeat("a", maxCreateBody+1)
-	rec := postCreateReader(h.handler, testAPIToken, "", strings.NewReader(body), -1)
+	rec := postCreateReader(h.handler, "", strings.NewReader(body), -1)
 	if rec.Code != http.StatusBadRequest || decodeError(t, rec) != "INVALID_REQUEST" {
 		t.Fatalf("status/body = %d %s", rec.Code, rec.Body.String())
 	}
@@ -139,8 +139,8 @@ func TestCreateRejectsOversizedUnknownLengthBody(t *testing.T) {
 func TestCreateIdempotentReplay(t *testing.T) {
 	h := newHarness(t, "")
 	body := `{"long_url":"https://example.com"}`
-	first := postCreate(h.handler, testAPIToken, "retry-key", body)
-	second := postCreate(h.handler, testAPIToken, "retry-key", body)
+	first := postCreate(h.handler, "retry-key", body)
+	second := postCreate(h.handler, "retry-key", body)
 	if first.Code != http.StatusCreated || second.Code != http.StatusCreated {
 		t.Fatalf("status %d / %d", first.Code, second.Code)
 	}
@@ -162,7 +162,7 @@ func TestCreateConcurrentIdempotentReplay(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			results <- postCreate(h.handler, testAPIToken, "concurrent", `{"long_url":"https://example.com/concurrent"}`)
+			results <- postCreate(h.handler, "concurrent", `{"long_url":"https://example.com/concurrent"}`)
 		}()
 	}
 	close(start)
@@ -182,31 +182,19 @@ func TestCreateConcurrentIdempotentReplay(t *testing.T) {
 
 func TestCreateIdempotencyConflict(t *testing.T) {
 	h := newHarness(t, "")
-	if rec := postCreate(h.handler, testAPIToken, "same", `{"long_url":"https://example.com/one"}`); rec.Code != http.StatusCreated {
+	if rec := postCreate(h.handler, "same", `{"long_url":"https://example.com/one"}`); rec.Code != http.StatusCreated {
 		t.Fatalf("seed = %d %s", rec.Code, rec.Body.String())
 	}
-	rec := postCreate(h.handler, testAPIToken, "same", `{"long_url":"https://example.com/two"}`)
+	rec := postCreate(h.handler, "same", `{"long_url":"https://example.com/two"}`)
 	if rec.Code != http.StatusConflict || decodeError(t, rec) != "IDEMPOTENCY_CONFLICT" {
 		t.Fatalf("status/body = %d %s", rec.Code, rec.Body.String())
 	}
 }
 
-func TestCreateIdempotencyIsOwnerScoped(t *testing.T) {
-	h := newHarness(t, "")
-	first := postCreate(h.handler, testAPIToken, "shared", `{"long_url":"https://example.com/a"}`)
-	second := postCreate(h.handler, testOtherToken, "shared", `{"long_url":"https://example.com/b"}`)
-	if first.Code != http.StatusCreated || second.Code != http.StatusCreated {
-		t.Fatalf("status %d / %d", first.Code, second.Code)
-	}
-	if decodeCreate(t, first).ShortCode == decodeCreate(t, second).ShortCode {
-		t.Fatal("owners shared a short code")
-	}
-}
-
 func TestCreateCanonicalHashIgnoresJSONLayout(t *testing.T) {
 	h := newHarness(t, "")
-	first := postCreate(h.handler, testAPIToken, "canon", "{\n  \"expires_in\": 157680000,\n  \"long_url\": \"https://example.com\" \n}")
-	second := postCreate(h.handler, testAPIToken, "canon", `{"long_url":"https://example.com","alias":""}`)
+	first := postCreate(h.handler, "canon", "{\n  \"expires_in\": 157680000,\n  \"long_url\": \"https://example.com\" \n}")
+	second := postCreate(h.handler, "canon", `{"long_url":"https://example.com","alias":""}`)
 	if first.Code != http.StatusCreated || second.Code != http.StatusCreated {
 		t.Fatalf("status %d / %d bodies %s / %s", first.Code, second.Code, first.Body.String(), second.Body.String())
 	}
@@ -223,10 +211,10 @@ func TestCreateCanonicalHashIgnoresJSONLayout(t *testing.T) {
 
 func TestCreateGeneratedCodeRetriesAliasCollision(t *testing.T) {
 	h := newHarness(t, "")
-	if rec := postCreate(h.handler, testAPIToken, "", `{"long_url":"https://example.com","alias":"UIiAFaQ"}`); rec.Code != http.StatusCreated {
+	if rec := postCreate(h.handler, "", `{"long_url":"https://example.com","alias":"UIiAFaQ"}`); rec.Code != http.StatusCreated {
 		t.Fatalf("seed = %d %s", rec.Code, rec.Body.String())
 	}
-	rec := postCreate(h.handler, testAPIToken, "", `{"long_url":"https://example.com/generated"}`)
+	rec := postCreate(h.handler, "", `{"long_url":"https://example.com/generated"}`)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d %s", rec.Code, rec.Body.String())
 	}
@@ -237,14 +225,14 @@ func TestCreateGeneratedCodeRetriesAliasCollision(t *testing.T) {
 
 func TestCreateCollisionDoesNotLeaveIdempotencyRecord(t *testing.T) {
 	h := newHarness(t, "")
-	if rec := postCreate(h.handler, testAPIToken, "", `{"long_url":"https://example.com","alias":"taken"}`); rec.Code != http.StatusCreated {
+	if rec := postCreate(h.handler, "", `{"long_url":"https://example.com","alias":"taken"}`); rec.Code != http.StatusCreated {
 		t.Fatal(rec.Body.String())
 	}
-	rec := postCreate(h.handler, testAPIToken, "orphan", `{"long_url":"https://example.com/new","alias":"taken"}`)
+	rec := postCreate(h.handler, "orphan", `{"long_url":"https://example.com/new","alias":"taken"}`)
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("status = %d", rec.Code)
 	}
-	retry := postCreate(h.handler, testAPIToken, "orphan", `{"long_url":"https://example.com/retry","alias":"fresh"}`)
+	retry := postCreate(h.handler, "orphan", `{"long_url":"https://example.com/retry","alias":"fresh"}`)
 	if retry.Code != http.StatusCreated {
 		t.Fatalf("retry status = %d %s", retry.Code, rec.Body.String())
 	}
@@ -270,7 +258,7 @@ func TestCreateValidationErrors(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			rec := postCreate(h.handler, testAPIToken, test.idem, test.body)
+			rec := postCreate(h.handler, test.idem, test.body)
 			if rec.Code != test.wantStatus || decodeError(t, rec) != test.wantError {
 				t.Fatalf("status/body = %d %s", rec.Code, rec.Body.String())
 			}
@@ -282,7 +270,6 @@ func TestCreateEmptyIdempotencyHeader(t *testing.T) {
 	h := newHarness(t, "")
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/links", strings.NewReader(`{"long_url":"https://example.com"}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Api-Key", testAPIToken)
 	req.Header["Idempotency-Key"] = []string{""}
 	rec := httptest.NewRecorder()
 	h.handler.ServeHTTP(rec, req)
@@ -294,20 +281,10 @@ func TestCreateEmptyIdempotencyHeader(t *testing.T) {
 func TestCreateWrongMethod(t *testing.T) {
 	h := newHarness(t, "")
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/links", nil)
-	req.Header.Set("X-Api-Key", testAPIToken)
 	rec := httptest.NewRecorder()
 	h.handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("status = %d", rec.Code)
-	}
-}
-
-func TestCreateMissingPrincipal(t *testing.T) {
-	api := &API{}
-	rec := httptest.NewRecorder()
-	api.create(rec, httptest.NewRequest(http.MethodPost, "/api/v1/links", strings.NewReader(`{}`)))
-	if rec.Code != http.StatusUnauthorized || decodeError(t, rec) != "UNAUTHORIZED" {
-		t.Fatalf("status/body = %d %s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -317,68 +294,62 @@ func TestCreateAllocatorAndStoreFailures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	creds := newTestCredentials(t)
 	t.Run("allocator", func(t *testing.T) {
 		h := New(Deps{
-			Store:       &countingStore{LinkStore: &memoryLinkStub{}},
-			Allocator:   failAllocator{err: platform.ErrDependency},
-			Clock:       memory.NewClock(now),
-			Credentials: creds,
-			Permuter:    permuter,
+			Store:     &countingStore{LinkStore: &memoryLinkStub{}},
+			Allocator: failAllocator{err: platform.ErrDependency},
+			Clock:     memory.NewClock(now),
+			Permuter:  permuter,
 		})
-		rec := postCreate(h, testAPIToken, "", `{"long_url":"https://example.com"}`)
+		rec := postCreate(h, "", `{"long_url":"https://example.com"}`)
 		if rec.Code != http.StatusServiceUnavailable || decodeError(t, rec) != "TEMPORARILY_UNAVAILABLE" {
 			t.Fatalf("status/body = %d %s", rec.Code, rec.Body.String())
 		}
 	})
 	t.Run("store", func(t *testing.T) {
 		h := New(Deps{
-			Store:       failStore{err: platform.ErrDependency},
-			Allocator:   &leaseAllocator{},
-			Clock:       memory.NewClock(now),
-			Credentials: creds,
-			Permuter:    permuter,
+			Store:     failStore{err: platform.ErrDependency},
+			Allocator: &leaseAllocator{},
+			Clock:     memory.NewClock(now),
+			Permuter:  permuter,
 		})
-		rec := postCreate(h, testAPIToken, "", `{"long_url":"https://example.com"}`)
+		rec := postCreate(h, "", `{"long_url":"https://example.com"}`)
 		if rec.Code != http.StatusServiceUnavailable || decodeError(t, rec) != "TEMPORARILY_UNAVAILABLE" {
 			t.Fatalf("status/body = %d %s", rec.Code, rec.Body.String())
 		}
 	})
 	t.Run("negative id", func(t *testing.T) {
 		h := New(Deps{
-			Store:       failStore{err: errors.New("unused")},
-			Allocator:   failAllocator{id: -1},
-			Clock:       memory.NewClock(now),
-			Credentials: creds,
-			Permuter:    permuter,
+			Store:     failStore{err: errors.New("unused")},
+			Allocator: failAllocator{id: -1},
+			Clock:     memory.NewClock(now),
+			Permuter:  permuter,
 		})
-		rec := postCreate(h, testAPIToken, "", `{"long_url":"https://example.com"}`)
+		rec := postCreate(h, "", `{"long_url":"https://example.com"}`)
 		if rec.Code != http.StatusServiceUnavailable {
 			t.Fatalf("status = %d", rec.Code)
 		}
 	})
 	t.Run("collision exhausted", func(t *testing.T) {
 		h := New(Deps{
-			Store:       failStore{err: platform.ErrCollision},
-			Allocator:   &leaseAllocator{},
-			Clock:       memory.NewClock(now),
-			Credentials: creds,
-			Permuter:    permuter,
+			Store:     failStore{err: platform.ErrCollision},
+			Allocator: &leaseAllocator{},
+			Clock:     memory.NewClock(now),
+			Permuter:  permuter,
 		})
-		rec := postCreate(h, testAPIToken, "", `{"long_url":"https://example.com"}`)
+		rec := postCreate(h, "", `{"long_url":"https://example.com"}`)
 		if rec.Code != http.StatusServiceUnavailable || decodeError(t, rec) != "TEMPORARILY_UNAVAILABLE" {
 			t.Fatalf("status/body = %d %s", rec.Code, rec.Body.String())
 		}
 	})
 	t.Run("permute out of range", func(t *testing.T) {
 		h := New(Deps{
-			Store:       failStore{err: errors.New("unused")},
-			Allocator:   failAllocator{id: int64(core.Base62Limit)},
-			Clock:       memory.NewClock(now),
-			Credentials: creds,
-			Permuter:    permuter,
+			Store:     failStore{err: errors.New("unused")},
+			Allocator: failAllocator{id: int64(core.Base62Limit)},
+			Clock:     memory.NewClock(now),
+			Permuter:  permuter,
 		})
-		rec := postCreate(h, testAPIToken, "", `{"long_url":"https://example.com"}`)
+		rec := postCreate(h, "", `{"long_url":"https://example.com"}`)
 		if rec.Code != http.StatusServiceUnavailable {
 			t.Fatalf("status = %d %s", rec.Code, rec.Body.String())
 		}
@@ -463,23 +434,3 @@ func (memoryLinkStub) Get(context.Context, string) (platform.Link, error) {
 func (memoryLinkStub) SoftDelete(context.Context, platform.Principal, string, time.Time, string) (platform.Deletion, error) {
 	return platform.Deletion{}, platform.ErrNotFound
 }
-
-func newTestCredentials(t *testing.T) *credentialStub {
-	t.Helper()
-	return &credentialStub{principal: platform.Principal{ActorID: testActor, Role: platform.RoleDeveloper, OwnerID: testOwner}}
-}
-
-type credentialStub struct {
-	principal platform.Principal
-	err       error
-}
-
-func (c *credentialStub) Store(context.Context, string, platform.Credential) error { return nil }
-func (c *credentialStub) Resolve(context.Context, string, time.Time) (platform.Principal, error) {
-	if c.err != nil {
-		return platform.Principal{}, c.err
-	}
-	return c.principal, nil
-}
-
-func (c *credentialStub) Revoke(context.Context, string) error { return c.err }

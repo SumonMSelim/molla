@@ -3,16 +3,12 @@ import {
   ApiError,
   ERROR_MESSAGES,
   LINKS_STORAGE,
-  API_KEY_STORAGE,
   createLink,
-  deleteLink,
   forgetLink,
-  getApiKey,
   getStats,
   loadLinks,
   messageFor,
   rememberLink,
-  setApiKey,
 } from './api.ts'
 
 afterEach(() => {
@@ -33,15 +29,6 @@ describe('messageFor', () => {
   })
 })
 
-describe('api key storage', () => {
-  it('keeps the key in sessionStorage only', () => {
-    setApiKey('dev-local-key')
-    expect(getApiKey()).toBe('dev-local-key')
-    expect(sessionStorage.getItem(API_KEY_STORAGE)).toBe('dev-local-key')
-    expect(localStorage.getItem(API_KEY_STORAGE)).toBeNull()
-  })
-})
-
 describe('remembered links', () => {
   it('stores created links in localStorage and drops them on forget', () => {
     const link = {
@@ -59,7 +46,7 @@ describe('remembered links', () => {
 })
 
 describe('createLink', () => {
-  it('sends X-Api-Key and a fresh Idempotency-Key', async () => {
+  it('sends no auth header and a fresh Idempotency-Key', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 201,
@@ -74,7 +61,6 @@ describe('createLink', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
     vi.stubGlobal('crypto', { randomUUID: () => 'idem-1' })
-    setApiKey('dev-local-key')
 
     const result = await createLink({ long_url: 'https://example.com', alias: 'mine' })
     expect(result.short_code).toBe('aB3xK9c')
@@ -82,7 +68,7 @@ describe('createLink', () => {
     const [path, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(path).toBe('/api/v1/links')
     const headers = init.headers as Record<string, string>
-    expect(headers['X-Api-Key']).toBe('dev-local-key')
+    expect(headers['X-Api-Key']).toBeUndefined()
     expect(headers['Idempotency-Key']).toBe('idem-1')
     expect(headers['Content-Type']).toBe('application/json')
     expect(JSON.parse(String(init.body))).toEqual({ long_url: 'https://example.com', alias: 'mine' })
@@ -104,7 +90,6 @@ describe('createLink', () => {
     vi.stubGlobal('fetch', fetchMock)
     const keys = ['first-key', 'second-key']
     vi.stubGlobal('crypto', { randomUUID: () => keys.shift() ?? 'overflow' })
-    setApiKey('k')
     await createLink({ long_url: 'https://example.com/one' })
     await createLink({ long_url: 'https://example.com/two' })
     const first = (fetchMock.mock.calls[0][1] as RequestInit).headers as Record<string, string>
@@ -126,31 +111,18 @@ describe('createLink', () => {
   })
 })
 
-describe('getStats and deleteLink', () => {
-  it('sends the API key on stats', async () => {
+describe('getStats', () => {
+  it('is a plain unauthenticated GET', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
       text: async () => JSON.stringify({ short_code: 'abc', clicks: 2, created_at: '2026-09-13T00:00:00Z' }),
     })
     vi.stubGlobal('fetch', fetchMock)
-    setApiKey('dev-local-key')
     await getStats('abc')
-    const headers = (fetchMock.mock.calls[0][1] as RequestInit).headers as Record<string, string>
-    expect(headers['X-Api-Key']).toBe('dev-local-key')
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/links/abc/stats')
-  })
-
-  it('treats 204 as success on delete', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 204,
-      text: async () => '',
-    })
-    vi.stubGlobal('fetch', fetchMock)
-    setApiKey('dev-local-key')
-    await deleteLink('abc')
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/links/abc')
-    expect((fetchMock.mock.calls[0][1] as RequestInit).method).toBe('DELETE')
+    const [path, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(path).toBe('/api/v1/links/abc/stats')
+    const headers = init.headers as Record<string, string>
+    expect(headers['X-Api-Key']).toBeUndefined()
   })
 })

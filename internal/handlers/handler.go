@@ -4,7 +4,6 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -21,64 +20,49 @@ const (
 	maxCodeAttempts   = 32
 )
 
-type principalContextKey struct{}
-
 // Deps are the ports the API mux needs. Callers construct adapters.
+//
+// The create and stats routes are unauthenticated: anyone may shorten a URL
+// or read a code's click count. There is no per-caller ownership in this
+// release; takedown is operator-only via cmd/admin, which uses Deleter
+// directly rather than through this HTTP API. A later release adds a
+// UI-driven token system and reintroduces per-owner delete.
 type Deps struct {
-	Store       platform.LinkStore
-	Allocator   platform.IDAllocator
-	Clock       platform.Clock
-	Credentials platform.CredentialStore
-	Permuter    *core.Permuter
-	PublicBase  string
-	Stats       platform.StatsStore
-	Invalidator platform.CacheInvalidator
-	Audit       platform.AuditSink
+	Store      platform.LinkStore
+	Allocator  platform.IDAllocator
+	Clock      platform.Clock
+	Permuter   *core.Permuter
+	PublicBase string
+	Stats      platform.StatsStore
 }
 
 type API struct {
-	store       platform.LinkStore
-	allocator   platform.IDAllocator
-	clock       platform.Clock
-	credentials platform.CredentialStore
-	permuter    *core.Permuter
-	publicBase  string
-	statsStore  platform.StatsStore
-	deleter     Deleter
+	store      platform.LinkStore
+	allocator  platform.IDAllocator
+	clock      platform.Clock
+	permuter   *core.Permuter
+	publicBase string
+	statsStore platform.StatsStore
 }
 
-// New returns the authenticated API mux.
+// New returns the public, unauthenticated API mux.
 func New(deps Deps) http.Handler {
 	base := strings.TrimRight(deps.PublicBase, "/")
 	if base == "" {
 		base = defaultPublicBase
 	}
 	api := &API{
-		store:       deps.Store,
-		allocator:   deps.Allocator,
-		clock:       deps.Clock,
-		credentials: deps.Credentials,
-		permuter:    deps.Permuter,
-		publicBase:  base,
-		statsStore:  deps.Stats,
-		deleter: Deleter{
-			Store:       deps.Store,
-			Invalidator: deps.Invalidator,
-			Audit:       deps.Audit,
-			Clock:       deps.Clock,
-		},
+		store:      deps.Store,
+		allocator:  deps.Allocator,
+		clock:      deps.Clock,
+		permuter:   deps.Permuter,
+		publicBase: base,
+		statsStore: deps.Stats,
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/links", api.create)
 	mux.HandleFunc("GET /api/v1/links/{short_code}/stats", api.stats)
-	mux.HandleFunc("DELETE /api/v1/links/{short_code}", api.delete)
-	return api.authenticate(mux)
-}
-
-// PrincipalFromContext returns the authenticated principal injected by middleware.
-func PrincipalFromContext(ctx context.Context) (platform.Principal, bool) {
-	principal, ok := ctx.Value(principalContextKey{}).(platform.Principal)
-	return principal, ok
+	return mux
 }
 
 type errorResponse struct {

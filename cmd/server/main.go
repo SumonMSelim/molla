@@ -4,7 +4,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"log"
 	"net/http"
@@ -15,7 +14,6 @@ import (
 	"github.com/SumonMSelim/molla/internal/adapters/memory"
 	"github.com/SumonMSelim/molla/internal/core"
 	"github.com/SumonMSelim/molla/internal/handlers"
-	"github.com/SumonMSelim/molla/internal/platform"
 )
 
 type liveClock struct{}
@@ -40,32 +38,16 @@ func newHandler() (http.Handler, error) {
 	}
 
 	clock := liveClock{}
-	now := clock.Now()
 	store := memory.NewLinkStore()
 	cache := memory.NewCache()
-	creds := memory.NewCredentialStore()
-	token := envOr("MOLLA_DEV_API_KEY", "dev-local-key")
-	err = creds.Store(context.Background(), token, platform.Credential{
-		ActorID:   "local-dev",
-		OwnerID:   "local-owner",
-		Status:    platform.CredentialActive,
-		IssuedAt:  now,
-		ExpiresAt: now.Add(platform.MaximumCredentialLifetime),
-	})
-	if err != nil {
-		return nil, err
-	}
 
 	api := handlers.New(handlers.Deps{
-		Store:       store,
-		Allocator:   memory.NewIDAllocator(0),
-		Clock:       clock,
-		Credentials: creds,
-		Permuter:    permuter,
-		PublicBase:  envOr("MOLLA_PUBLIC_BASE", "http://127.0.0.1:8080"),
-		Stats:       memory.NewStatsStore(),
-		Invalidator: memory.NewCacheInvalidator(cache),
-		Audit:       &memory.AuditSink{},
+		Store:      store,
+		Allocator:  memory.NewIDAllocator(0),
+		Clock:      clock,
+		Permuter:   permuter,
+		PublicBase: envOr("MOLLA_PUBLIC_BASE", "http://127.0.0.1:8080"),
+		Stats:      memory.NewStatsStore(),
 	})
 	redirect := handlers.NewRedirect(handlers.RedirectDeps{
 		Store:      store,

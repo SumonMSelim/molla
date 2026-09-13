@@ -19,43 +19,27 @@ Load tests run only from an operator workstation against **dev** or a dedicated 
 3. Set tfvars: `permutation_key`, `privacy_key`, `redis_auth_token` (≥16 chars), `admin_principal_arns`, `origin_verify_secret` (≥32 random chars). Prod also needs alarm email, budget, and central trail/config/guardduty IDs.
 4. `terraform init` and reviewed `terraform plan` in `envs/dev`, then `apply` only with short-lived credentials and explicit approval.
 5. ACM + DNS: set `domain_name` (`mol.la`) and `cloudflare_zone_id` in tfvars and export `CLOUDFLARE_API_TOKEN` (scopes: Zone:DNS:Edit, Zone:Zone Settings:Edit, Zone:Transform Rules:Edit on the mol.la zone). Terraform creates the ACM validation records, the proxied apex CNAME to CloudFront, sets SSL to Full (strict), and a Transform Rule that stamps `X-Origin-Verify`. Empty `domain_name` keeps the CloudFront hostname with no origin check. Cloudflare WAF/rate limiting is the firewall; there is no AWS WAF.
-6. Seed the first developer key (below).
-7. `make web-build` and `aws s3 sync web/dist s3://$(terraform output -raw ui_bucket)/app --delete`. Invalidate CloudFront `/app/*`.
-8. Confirm `GET https://mol.la/app/` and `POST /api/v1/links` with both the API Gateway key and `X-Api-Key`. Confirm `GET https://<distribution>.cloudfront.net/` returns 403 (Cloudflare bypass blocked).
+6. `make web-build` and `aws s3 sync web/dist s3://$(terraform output -raw ui_bucket)/app --delete`. Invalidate CloudFront `/app/*`.
+7. Confirm `GET https://mol.la/app/` and `POST /api/v1/links` (no auth header needed). Confirm `GET https://<distribution>.cloudfront.net/` returns 403 (Cloudflare bypass blocked).
 
 ## Rotate the origin secret
 
 Change `origin_verify_secret` and apply. Cloudflare's rule and the CloudFront function update in one plan; expect a few seconds of 403s while the function propagates. Rotate if the value leaks (CloudFront function code is readable by anyone with `cloudfront:DescribeFunction`).
 
-## Rotate developer keys
+## API authentication (currently disabled)
 
-Go authenticates SHA-256 hashes in DynamoDB (`Credentials`). API Gateway meters a separate key value. Both must match the raw token the client sends as `X-Api-Key`.
+`POST /api/v1/links` and `GET /api/v1/links/{code}/stats` are public and unauthenticated. Anyone can shorten a URL or read a code's click count; there is no owner and no per-caller quota beyond the shared rate limits below. `DELETE /api/v1/links/{code}` does not exist; only an operator can remove a link (see Takedown).
 
-**Issue new, then revoke old.** Max lifetime 90 days.
+The `Credentials` DynamoDB table, `platform.CredentialStore`, and `go run ./cmd/admin issue`/`revoke` still exist but nothing in the API checks them today — they are scaffolding for a later UI-driven token system where a registered user gets their own key. Do not issue credentials expecting them to gate anything yet.
 
-```sh
-# Assume the admin role from terraform output admin_role_arn.
-export MOLLA_INVALIDATE_FUNCTION=$(terraform output -raw invalidate_function_name)
-export MOLLA_LINKS_TABLE=molla-dev-links   # match terraform table names
-export MOLLA_CREDENTIALS_TABLE=molla-dev-credentials
+## Rate limiting
 
-# Bind an existing API Gateway key value into DynamoDB:
-aws apigateway get-api-key --api-key "$(terraform output -raw api_key_id)" --include-value
-go run ./cmd/admin issue --owner OWNER --token THE_GATEWAY_VALUE --days 90
+Two independent layers, since there is no per-caller auth to key a limit on:
 
-# Or generate a token, then create a Gateway key with that exact value and attach it to usage_plan_id:
-go run ./cmd/admin issue --owner OWNER --days 90
-# stdout prints the raw token once. Create API key with that value; associate with the usage plan.
-```
+- **Cloudflare** rate-limits `POST /api/v1/links` per client IP (`modules/edge` ruleset). This is the real abuse control for anonymous create.
+- **API Gateway** stage throttle (`throttle_rate_limit`/`throttle_burst_limit`) caps total throughput across all callers; it is not per-IP.
 
-Revoke the old key only after clients use the new token, then disable the old API Gateway key.
-
-```sh
-# token_hash is the SHA-256 of the old raw token (DynamoDB stores only the hash).
-go run ./cmd/admin revoke --token-hash "$(printf %s "$OLD_TOKEN" | shasum -a 256 | cut -d" " -f1)"
-```
-
-Revoking an unknown hash fails with a not-found error and changes nothing. Audit JSON on stderr.
+Tune the Cloudflare rule first if create abuse shows up; the stage throttle is a blunt aggregate ceiling.
 
 ## Takedown
 

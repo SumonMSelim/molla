@@ -1,12 +1,13 @@
+// Deleter is used by cmd/admin's operator takedown command, not by the
+// public HTTP API: this release has no authenticated caller to own a link,
+// so there is no HTTP delete route. See handler.go.
 package handlers
 
 import (
 	"context"
 	"errors"
-	"net/http"
 
 	"github.com/SumonMSelim/molla/internal/adapters/logging"
-	"github.com/SumonMSelim/molla/internal/core"
 	"github.com/SumonMSelim/molla/internal/platform"
 )
 
@@ -60,34 +61,4 @@ func (d Deleter) Delete(ctx context.Context, principal platform.Principal, code,
 		log.Error("audit write failed", "outcome", auditDeleted, "error", auditErr)
 	}
 	return nil
-}
-
-func (a *API) delete(w http.ResponseWriter, r *http.Request) {
-	principal, ok := PrincipalFromContext(r.Context())
-	if !ok {
-		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED")
-		return
-	}
-	code := r.PathValue("short_code")
-	if core.ValidateAlias(code) != nil {
-		writeError(w, http.StatusNotFound, "NOT_FOUND")
-		return
-	}
-	err := a.deleter.Delete(r.Context(), principal, code, "")
-	if err == nil {
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
-	writeDeleteError(w, err)
-}
-
-func writeDeleteError(w http.ResponseWriter, err error) {
-	switch {
-	case errors.Is(err, platform.ErrNotFound):
-		writeError(w, http.StatusNotFound, "NOT_FOUND")
-	case errors.Is(err, platform.ErrForbidden):
-		writeError(w, http.StatusForbidden, "FORBIDDEN")
-	default:
-		writeError(w, http.StatusServiceUnavailable, "TEMPORARILY_UNAVAILABLE")
-	}
 }

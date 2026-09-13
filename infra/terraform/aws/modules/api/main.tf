@@ -11,11 +11,10 @@ resource "aws_api_gateway_resource" "proxy" {
 }
 
 resource "aws_api_gateway_method" "proxy" {
-  rest_api_id      = aws_api_gateway_rest_api.this.id
-  resource_id      = aws_api_gateway_resource.proxy.id
-  http_method      = "ANY"
-  authorization    = "NONE"
-  api_key_required = true
+  rest_api_id   = aws_api_gateway_rest_api.this.id
+  resource_id   = aws_api_gateway_resource.proxy.id
+  http_method   = "ANY"
+  authorization = "NONE"
 }
 
 resource "aws_api_gateway_integration" "proxy" {
@@ -70,44 +69,6 @@ resource "aws_api_gateway_method_settings" "all" {
     logging_level          = "ERROR"
     throttling_rate_limit  = var.throttle_rate_limit
     throttling_burst_limit = var.throttle_burst_limit
-  }
-}
-
-resource "aws_api_gateway_api_key" "metering" {
-  name = "${var.name_prefix}-metering"
-  tags = var.tags
-}
-
-resource "aws_api_gateway_usage_plan" "this" {
-  name = "${var.name_prefix}-plan"
-  api_stages {
-    api_id = aws_api_gateway_rest_api.this.id
-    stage  = aws_api_gateway_stage.live.stage_name
-  }
-  # Single shared metering key today, so the per-key limit tracks the stage limit.
-  throttle_settings {
-    rate_limit  = var.throttle_rate_limit
-    burst_limit = var.throttle_burst_limit
-  }
-  quota_settings {
-    limit  = 100000
-    period = "DAY"
-  }
-  tags = var.tags
-}
-
-resource "aws_api_gateway_usage_plan_key" "metering" {
-  key_id        = aws_api_gateway_api_key.metering.id
-  key_type      = "API_KEY"
-  usage_plan_id = aws_api_gateway_usage_plan.this.id
-}
-
-resource "aws_api_gateway_gateway_response" "invalid_api_key" {
-  rest_api_id   = aws_api_gateway_rest_api.this.id
-  response_type = "INVALID_API_KEY"
-  status_code   = "401"
-  response_templates = {
-    "application/json" = "{\"error\":\"UNAUTHORIZED\"}"
   }
 }
 

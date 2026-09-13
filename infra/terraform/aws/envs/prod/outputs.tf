@@ -14,14 +14,6 @@ output "api_invoke_url" {
   value = module.api.invoke_url
 }
 
-output "usage_plan_id" {
-  value = module.api.usage_plan_id
-}
-
-output "api_key_id" {
-  value = module.api.api_key_id
-}
-
 output "admin_role_arn" {
   value = module.api.admin_role_arn
 }

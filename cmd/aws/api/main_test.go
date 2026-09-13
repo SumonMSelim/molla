@@ -18,7 +18,6 @@ func withFakeAWS(t *testing.T) {
 	srv := httptest.NewServer(ddbfake.New())
 	t.Cleanup(srv.Close)
 	t.Setenv("MOLLA_AWS_ENDPOINT", srv.URL)
-	t.Setenv("MOLLA_INVALIDATE_FUNCTION", "molla-invalidate")
 }
 
 func TestNewHandlerRequiresPermutationKey(t *testing.T) {
@@ -28,7 +27,7 @@ func TestNewHandlerRequiresPermutationKey(t *testing.T) {
 	}
 }
 
-func TestLambdaAdapterUnauthorized(t *testing.T) {
+func TestLambdaAdapterCreateIsUnauthenticated(t *testing.T) {
 	withFakeAWS(t)
 	t.Setenv("MOLLA_PERMUTATION_KEY", "molla-slice-1-fixed-test-key")
 	t.Setenv("MOLLA_PUBLIC_BASE", "https://mol.la")
@@ -45,38 +44,17 @@ func TestLambdaAdapterUnauthorized(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != http.StatusUnauthorized {
+	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("status = %d, body = %s", resp.StatusCode, resp.Body)
 	}
 	var body struct {
-		Error string `json:"error"`
+		ShortCode string `json:"short_code"`
 	}
 	if err := json.Unmarshal([]byte(resp.Body), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body.Error != "UNAUTHORIZED" {
-		t.Fatalf("error = %q", body.Error)
-	}
-}
-
-func TestLambdaAdapterInvalidKey(t *testing.T) {
-	withFakeAWS(t)
-	t.Setenv("MOLLA_PERMUTATION_KEY", "molla-slice-1-fixed-test-key")
-	handler, err := newHandler()
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp, err := httpadapter.New(handler).ProxyWithContext(context.Background(), events.APIGatewayProxyRequest{
-		HTTPMethod: http.MethodPost,
-		Path:       "/api/v1/links",
-		Headers:    map[string]string{"Content-Type": "application/json", "X-Api-Key": "nope"},
-		Body:       `{"long_url":"https://example.com"}`,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resp.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("status = %d, body = %s", resp.StatusCode, resp.Body)
+	if body.ShortCode == "" {
+		t.Fatal("missing short_code")
 	}
 }
 

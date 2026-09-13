@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -29,7 +28,6 @@ func TestLocalServerCreateAndRedirect(t *testing.T) {
 	t.Setenv("MOLLA_PERMUTATION_KEY", "molla-slice-1-fixed-test-key")
 	t.Setenv("MOLLA_PRIVACY_KEY", "privacy-test-key")
 	t.Setenv("MOLLA_PUBLIC_BASE", "http://127.0.0.1:8080")
-	t.Setenv("MOLLA_DEV_API_KEY", "dev-local-key")
 
 	handler, err := newHandler()
 	if err != nil {
@@ -38,7 +36,6 @@ func TestLocalServerCreateAndRedirect(t *testing.T) {
 
 	create := httptest.NewRequest(http.MethodPost, "/api/v1/links", strings.NewReader(`{"long_url":"https://example.com/local"}`))
 	create.Header.Set("Content-Type", "application/json")
-	create.Header.Set("X-Api-Key", "dev-local-key")
 	create.Header.Set("Idempotency-Key", "local-one")
 	created := httptest.NewRecorder()
 	handler.ServeHTTP(created, create)
@@ -63,25 +60,5 @@ func TestLocalServerCreateAndRedirect(t *testing.T) {
 	}
 	if loc := got.Header().Get("Location"); loc != "https://example.com/local" {
 		t.Fatalf("Location = %q", loc)
-	}
-}
-
-func TestLocalServerUnauthorized(t *testing.T) {
-	t.Setenv("MOLLA_PERMUTATION_KEY", "molla-slice-1-fixed-test-key")
-	t.Setenv("MOLLA_PRIVACY_KEY", "privacy-test-key")
-	handler, err := newHandler()
-	if err != nil {
-		t.Fatal(err)
-	}
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/links", strings.NewReader(`{"long_url":"https://example.com"}`))
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("status = %d", rec.Code)
-	}
-	payload, _ := io.ReadAll(rec.Body)
-	if !strings.Contains(string(payload), "UNAUTHORIZED") {
-		t.Fatalf("body = %s", payload)
 	}
 }

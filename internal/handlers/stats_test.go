@@ -14,11 +14,11 @@ import (
 
 func TestStatsClicksAndZeroDefault(t *testing.T) {
 	h := newHarness(t, "")
-	rec := postCreate(h.handler, testAPIToken, "", `{"long_url":"https://example.com","alias":"statzzz"}`)
+	rec := postCreate(h.handler, "", `{"long_url":"https://example.com","alias":"statzzz"}`)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create = %d %s", rec.Code, rec.Body.String())
 	}
-	zero := getStats(h.handler, testAPIToken, "statzzz")
+	zero := getStats(h.handler, "statzzz")
 	if zero.Code != http.StatusOK {
 		t.Fatalf("status = %d %s", zero.Code, zero.Body.String())
 	}
@@ -31,7 +31,7 @@ func TestStatsClicksAndZeroDefault(t *testing.T) {
 	if err := h.stats.Increment(context.Background(), "statzzz", 10, last); err != nil {
 		t.Fatal(err)
 	}
-	with := getStats(h.handler, testAPIToken, "statzzz")
+	with := getStats(h.handler, "statzzz")
 	if with.Code != http.StatusOK {
 		t.Fatalf("status = %d %s", with.Code, with.Body.String())
 	}
@@ -41,44 +41,43 @@ func TestStatsClicksAndZeroDefault(t *testing.T) {
 	}
 }
 
-func TestStatsInactiveExpiredUnknownAndForbidden(t *testing.T) {
+func TestStatsInactiveAndExpiredAndUnknown(t *testing.T) {
 	h := newHarness(t, "")
-	if rec := postCreate(h.handler, testAPIToken, "", `{"long_url":"https://example.com","alias":"ownedxx"}`); rec.Code != http.StatusCreated {
+	if rec := postCreate(h.handler, "", `{"long_url":"https://example.com","alias":"deletdx"}`); rec.Code != http.StatusCreated {
 		t.Fatalf("create = %d", rec.Code)
 	}
-	if rec := postCreate(h.handler, testAPIToken, "", `{"long_url":"https://example.com","alias":"expcode","expires_in":60}`); rec.Code != http.StatusCreated {
+	if rec := postCreate(h.handler, "", `{"long_url":"https://example.com","alias":"expcode","expires_in":60}`); rec.Code != http.StatusCreated {
 		t.Fatalf("create expiry = %d", rec.Code)
 	}
-	if rec := deleteLink(h.handler, testAPIToken, "ownedxx"); rec.Code != http.StatusNoContent {
-		t.Fatalf("delete = %d %s", rec.Code, rec.Body.String())
+	deleter := Deleter{
+		Store:       h.store,
+		Invalidator: memory.NewCacheInvalidator(h.cache),
+		Audit:       &memory.AuditSink{},
+		Clock:       h.clock,
 	}
-	inactive := getStats(h.handler, testAPIToken, "ownedxx")
-	if inactive.Code != http.StatusOK || decodeStats(t, inactive).Clicks != 0 {
-		t.Fatalf("inactive stats = %d %s", inactive.Code, inactive.Body.String())
+	operator := platform.Principal{ActorID: "arn:aws:iam::1:user/ops", Role: platform.RoleOperator}
+	if err := deleter.Delete(context.Background(), operator, "deletdx", "malware"); err != nil {
+		t.Fatal(err)
+	}
+	deleted := getStats(h.handler, "deletdx")
+	if deleted.Code != http.StatusNotFound || decodeError(t, deleted) != "NOT_FOUND" {
+		t.Fatalf("deleted link stats = %d %s", deleted.Code, deleted.Body.String())
 	}
 
 	h.clock.Advance(61 * time.Second)
-	expired := getStats(h.handler, testAPIToken, "expcode")
+	expired := getStats(h.handler, "expcode")
 	if expired.Code != http.StatusOK || decodeStats(t, expired).ShortCode != "expcode" {
 		t.Fatalf("expired stats = %d %s", expired.Code, expired.Body.String())
 	}
 	h.clock.Set(h.now)
 
-	missing := getStats(h.handler, testAPIToken, "noexist")
+	missing := getStats(h.handler, "noexist")
 	if missing.Code != http.StatusNotFound || decodeError(t, missing) != "NOT_FOUND" {
 		t.Fatalf("unknown = %d %s", missing.Code, missing.Body.String())
 	}
-	other := getStats(h.handler, testOtherToken, "expcode")
-	if other.Code != http.StatusForbidden || decodeError(t, other) != "FORBIDDEN" {
-		t.Fatalf("other owner = %d %s", other.Code, other.Body.String())
-	}
-	invalid := getStats(h.handler, testAPIToken, "ab")
+	invalid := getStats(h.handler, "ab")
 	if invalid.Code != http.StatusNotFound {
 		t.Fatalf("invalid code = %d", invalid.Code)
-	}
-	unauth := getStats(h.handler, "", "expcode")
-	if unauth.Code != http.StatusUnauthorized {
-		t.Fatalf("unauth = %d", unauth.Code)
 	}
 }
 
@@ -88,19 +87,15 @@ func TestStatsStoreAndLinkErrors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	creds := newTestCredentials(t)
 	t.Run("link dependency", func(t *testing.T) {
 		h := New(Deps{
-			Store:       failLinkStore{err: platform.ErrDependency},
-			Allocator:   &leaseAllocator{},
-			Clock:       memory.NewClock(now),
-			Credentials: creds,
-			Permuter:    permuter,
-			Stats:       memory.NewStatsStore(),
-			Invalidator: memory.NewCacheInvalidator(memory.NewCache()),
-			Audit:       &memory.AuditSink{},
+			Store:     failLinkStore{err: platform.ErrDependency},
+			Allocator: &leaseAllocator{},
+			Clock:     memory.NewClock(now),
+			Permuter:  permuter,
+			Stats:     memory.NewStatsStore(),
 		})
-		rec := getStats(h, testAPIToken, "statzzz")
+		rec := getStats(h, "statzzz")
 		if rec.Code != http.StatusServiceUnavailable || decodeError(t, rec) != "TEMPORARILY_UNAVAILABLE" {
 			t.Fatalf("status/body = %d %s", rec.Code, rec.Body.String())
 		}
@@ -108,34 +103,31 @@ func TestStatsStoreAndLinkErrors(t *testing.T) {
 	t.Run("stats dependency", func(t *testing.T) {
 		store := memory.NewLinkStore()
 		link := platform.Link{
-			ShortCode: "statzzz", LongURL: "https://example.com", OwnerID: testOwner,
+			ShortCode: "statzzz", LongURL: "https://example.com", IsActive: true,
 			CreatedAt: now, ExpiresAt: now.Add(time.Hour),
 		}
 		if _, err := store.Create(context.Background(), link, nil); err != nil {
 			t.Fatal(err)
 		}
 		h := New(Deps{
-			Store:       store,
-			Allocator:   &leaseAllocator{},
-			Clock:       memory.NewClock(now),
-			Credentials: creds,
-			Permuter:    permuter,
-			Stats:       failStats{err: platform.ErrDependency},
-			Invalidator: memory.NewCacheInvalidator(memory.NewCache()),
-			Audit:       &memory.AuditSink{},
+			Store:     store,
+			Allocator: &leaseAllocator{},
+			Clock:     memory.NewClock(now),
+			Permuter:  permuter,
+			Stats:     failStats{err: platform.ErrDependency},
 		})
-		rec := getStats(h, testAPIToken, "statzzz")
+		rec := getStats(h, "statzzz")
 		if rec.Code != http.StatusServiceUnavailable {
 			t.Fatalf("status = %d %s", rec.Code, rec.Body.String())
 		}
 	})
-	t.Run("missing principal", func(t *testing.T) {
+	t.Run("invalid code", func(t *testing.T) {
 		api := &API{}
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/links/statzzz/stats", nil)
-		req.SetPathValue("short_code", "statzzz")
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/links/ab/stats", nil)
+		req.SetPathValue("short_code", "ab")
 		api.stats(rec, req)
-		if rec.Code != http.StatusUnauthorized {
+		if rec.Code != http.StatusNotFound {
 			t.Fatalf("status = %d", rec.Code)
 		}
 	})

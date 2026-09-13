@@ -81,3 +81,26 @@ resource "cloudflare_ruleset" "origin_verify" {
     }
   }]
 }
+
+# POST /api/v1/links is unauthenticated (no owner, no per-caller API key), so
+# Cloudflare's per-IP rate limit is the abuse control on public link creation.
+# API Gateway's stage throttle only bounds aggregate throughput, not one caller.
+resource "cloudflare_ruleset" "api_rate_limit" {
+  count   = var.domain_name == "" ? 0 : 1
+  zone_id = var.cloudflare_zone_id
+  name    = "${var.name_prefix}-api-rate-limit"
+  kind    = "zone"
+  phase   = "http_ratelimit"
+  rules = [{
+    description = "Rate-limit public link creation per client IP"
+    expression  = "(http.request.uri.path eq \"/api/v1/links\" and http.request.method eq \"POST\")"
+    enabled     = true
+    action      = "block"
+    ratelimit = {
+      characteristics     = ["ip.src"]
+      period              = 60
+      requests_per_period = 10
+      mitigation_timeout  = 600
+    }
+  }]
+}

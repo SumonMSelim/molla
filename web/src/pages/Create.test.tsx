@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { CreatePage } from './Create.tsx'
 
 describe('CreatePage', () => {
-  it('creates a link and shows the short URL', async () => {
+  it('creates a link with no auth header and shows the short URL', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 201,
@@ -20,13 +20,12 @@ describe('CreatePage', () => {
     vi.stubGlobal('crypto', { randomUUID: () => 'idem-create' })
     render(<CreatePage selected={null} onOpen={() => undefined} onClear={() => undefined} />)
 
-    fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'dev-local-key' } })
     fireEvent.change(screen.getByLabelText('Long URL'), { target: { value: 'https://example.com/path' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create short link' }))
 
     expect(await screen.findByText('http://127.0.0.1:8080/alias01')).toBeInTheDocument()
     const headers = (fetchMock.mock.calls[0][1] as RequestInit).headers as Record<string, string>
-    expect(headers['X-Api-Key']).toBe('dev-local-key')
+    expect(headers['X-Api-Key']).toBeUndefined()
     expect(headers['Idempotency-Key']).toBe('idem-create')
   })
 
@@ -39,7 +38,6 @@ describe('CreatePage', () => {
     vi.stubGlobal('crypto', { randomUUID: () => 'idem-taken' })
     render(<CreatePage selected={null} onOpen={() => undefined} onClear={() => undefined} />)
 
-    fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'dev-local-key' } })
     fireEvent.change(screen.getByLabelText('Long URL'), { target: { value: 'https://example.com' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create short link' }))
 

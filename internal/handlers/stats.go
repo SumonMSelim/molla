@@ -18,11 +18,6 @@ type statsResponse struct {
 }
 
 func (a *API) stats(w http.ResponseWriter, r *http.Request) {
-	principal, ok := PrincipalFromContext(r.Context())
-	if !ok {
-		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED")
-		return
-	}
 	code := r.PathValue("short_code")
 	if core.ValidateAlias(code) != nil {
 		writeError(w, http.StatusNotFound, "NOT_FOUND")
@@ -39,8 +34,10 @@ func (a *API) stats(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "TEMPORARILY_UNAVAILABLE")
 		return
 	}
-	if principal.OwnerID == "" || principal.OwnerID != link.OwnerID {
-		writeError(w, http.StatusForbidden, "FORBIDDEN")
+	// Stats are public, but a taken-down or deleted link should not confirm
+	// its own existence or leak its click history.
+	if !link.IsActive {
+		writeError(w, http.StatusNotFound, "NOT_FOUND")
 		return
 	}
 
