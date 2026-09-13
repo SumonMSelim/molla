@@ -68,8 +68,8 @@ resource "aws_api_gateway_method_settings" "all" {
   settings {
     metrics_enabled        = true
     logging_level          = "ERROR"
-    throttling_rate_limit  = 12
-    throttling_burst_limit = 24
+    throttling_rate_limit  = var.throttle_rate_limit
+    throttling_burst_limit = var.throttle_burst_limit
   }
 }
 
@@ -84,9 +84,10 @@ resource "aws_api_gateway_usage_plan" "this" {
     api_id = aws_api_gateway_rest_api.this.id
     stage  = aws_api_gateway_stage.live.stage_name
   }
+  # Single shared metering key today, so the per-key limit tracks the stage limit.
   throttle_settings {
-    rate_limit  = 10
-    burst_limit = 20
+    rate_limit  = var.throttle_rate_limit
+    burst_limit = var.throttle_burst_limit
   }
   quota_settings {
     limit  = 100000

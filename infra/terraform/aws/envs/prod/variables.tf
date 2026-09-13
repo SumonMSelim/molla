@@ -22,9 +22,9 @@ variable "admin_principal_arns" {
   type = list(string)
 }
 
+# No default: prod must be given real build artifacts (placeholders are dev/validate only).
 variable "artifact_dir" {
-  type    = string
-  default = "../../placeholders"
+  type = string
 }
 
 variable "budget_limit" {

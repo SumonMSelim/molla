@@ -63,6 +63,18 @@ variable "provisioned_concurrency" {
   default     = 1
 }
 
+variable "throttle_rate_limit" {
+  type        = number
+  description = "Stage-wide steady request rate. Prod: 185 (154 peak * 1.2)."
+  default     = 20
+}
+
+variable "throttle_burst_limit" {
+  type        = number
+  description = "Stage-wide burst capacity. Prod: 370 (2x steady rate)."
+  default     = 40
+}
+
 variable "log_retention_days" {
   type    = number
   default = 30

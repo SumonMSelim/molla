@@ -11,7 +11,8 @@ locals {
   quota_headroom = {
     lambda_redirect_provisioned = 192
     kinesis_shards              = 20
-    api_gateway_stage_rate      = 12
+    api_gateway_stage_rate      = 185
+    api_gateway_stage_burst     = 370
     dynamodb_on_demand          = "adaptive"
     vpc_interface_endpoints     = 2
   }
@@ -83,6 +84,8 @@ module "api" {
   permutation_key         = var.permutation_key
   privacy_key             = var.privacy_key
   provisioned_concurrency = local.quota_headroom.lambda_redirect_provisioned
+  throttle_rate_limit     = local.quota_headroom.api_gateway_stage_rate
+  throttle_burst_limit    = local.quota_headroom.api_gateway_stage_burst
   admin_principal_arns    = var.admin_principal_arns
   alarm_actions           = [aws_sns_topic.alarms.arn]
   tags                    = local.tags
