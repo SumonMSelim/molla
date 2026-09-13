@@ -3,27 +3,24 @@ import { Chrome, LegalDoc } from './Chrome.tsx'
 export function AboutPage() {
   return (
     <Chrome width="prose">
-      <LegalDoc title="About" updated="13 September 2026">
+      <LegalDoc title="About" updated="14 September 2026">
         <p>
-          mol.la is an open-source URL shortener. It turns a long http(s) URL into a short code, redirects with HTTP 302, and
-          exposes create, stats, and delete over a JSON API.
+          mol.la turns a long web address into a short link that redirects to it. Anyone can create a short link; no account
+          or sign-up is required.
         </p>
         <h2>What it does</h2>
         <ul>
-          <li>Optional custom aliases and expiry.</li>
-          <li>Click counts that are eventually consistent, not billing-grade.</li>
-          <li>Owner delete and operator takedown without fetching the destination.</li>
+          <li>Shortens any http or https address into a short code you can share.</li>
+          <li>Optional custom alias and expiry, up to 1,825 days (5 years) by default.</li>
+          <li>Click counts for any short link, viewable by anyone who has the code.</li>
         </ul>
         <h2>What it does not do</h2>
         <p>
-          The write path never fetches the target URL. There is no preview, liveness check, or reputation crawl on create. The
-          first release does not issue credentials from this UI.
+          Creating a link never visits or previews the destination. There is no crawler, no scanner, and no ranking of
+          links. mol.la does not endorse, verify, or vouch for what a short link points to.
         </p>
-        <h2>Project</h2>
-        <p>
-          mol.la is MIT-licensed. Source, issues, and the security policy live in the public repository. Report suspected
-          vulnerabilities privately as SECURITY.md describes — not in a public issue.
-        </p>
+        <h2>Open source</h2>
+        <p>mol.la is open-source and MIT-licensed.</p>
       </LegalDoc>
     </Chrome>
   )
