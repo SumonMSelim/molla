@@ -1,0 +1,192 @@
+import { useId, useState, type FormEvent } from 'react'
+import { ApiError, createLink, getApiKey, rememberLink, setApiKey, type StoredLink } from '../api.ts'
+import { Chrome } from './Chrome.tsx'
+import { LinkPage } from './Link.tsx'
+
+const fieldClass =
+  'flex h-12 w-full border border-input bg-background px-3.5 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-brand focus-visible:glow'
+
+type CreatePageProps = {
+  selected: string | null
+  onOpen: (code: string) => void
+  onClear: () => void
+}
+
+export function CreatePage({ selected, onOpen, onClear }: CreatePageProps) {
+  const urlId = useId()
+  const aliasId = useId()
+  const expiryId = useId()
+  const keyId = useId()
+  const [apiKey, setApiKeyField] = useState(getApiKey)
+  const [longUrl, setLongUrl] = useState('')
+  const [alias, setAlias] = useState('')
+  const [expiresIn, setExpiresIn] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [created, setCreated] = useState<StoredLink | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault()
+    setError('')
+    setCopied(false)
+    setApiKey(apiKey)
+    setBusy(true)
+    try {
+      const expires_in = expiresIn.trim() === '' ? undefined : Number(expiresIn)
+      const result = await createLink(
+        {
+          long_url: longUrl.trim(),
+          alias: alias.trim() || undefined,
+          expires_in,
+        },
+        apiKey.trim(),
+      )
+      rememberLink({
+        short_code: result.short_code,
+        short_url: result.short_url,
+        long_url: result.long_url,
+        created_at: result.created_at,
+      })
+      setCreated({
+        short_code: result.short_code,
+        short_url: result.short_url,
+        long_url: result.long_url,
+        created_at: result.created_at,
+      })
+      onOpen(result.short_code)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Something went wrong.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function copy(url: string) {
+    await navigator.clipboard.writeText(url)
+    setCopied(true)
+  }
+
+  return (
+    <Chrome
+      trailing={
+        <label className="flex min-w-0 max-w-56 flex-col gap-1">
+          <span className="text-[10px] font-medium tracking-[0.08em] text-muted-foreground uppercase">API key</span>
+          <input
+            id={keyId}
+            name="api_key"
+            type="password"
+            autoComplete="off"
+            aria-label="API key"
+            value={apiKey}
+            onChange={(e) => setApiKeyField(e.target.value)}
+            className="flex h-9 w-full border border-input bg-background px-3 text-sm outline-none focus-visible:border-brand focus-visible:glow"
+            required
+          />
+        </label>
+      }
+    >
+        <form onSubmit={onSubmit} className="relative pt-5">
+          <div className="absolute top-0 left-6 z-10 border border-b-0 border-border bg-card px-4 py-2 text-sm font-medium">
+            Short link
+          </div>
+          <div className="border border-border bg-card px-6 pb-6 pt-10 sm:px-8 sm:pb-8">
+            <h1 className="text-title font-semibold">Shorten a long link</h1>
+            <div className="mt-6 flex flex-col gap-2">
+              <label className="text-sm font-medium text-brand-text" htmlFor={urlId}>
+                Long URL
+              </label>
+              <p className="text-xs text-muted-foreground">Paste your long link here</p>
+              <input
+                id={urlId}
+                name="long_url"
+                type="url"
+                value={longUrl}
+                onChange={(e) => setLongUrl(e.target.value)}
+                className={`${fieldClass} font-mono text-code`}
+                placeholder="https://example.com/my-long-url"
+                required
+              />
+            </div>
+            <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-start">
+              <button
+                type="submit"
+                disabled={busy}
+                className="inline-flex h-12 shrink-0 items-center justify-center bg-brand px-5 text-sm font-medium text-brand-foreground hover:bg-brand/90 hover:glow focus-visible:glow disabled:opacity-50"
+              >
+                {busy ? 'Creating…' : 'Create short link'}
+              </button>
+              <details className="min-w-0 flex-1 border border-border">
+                <summary className="cursor-pointer px-3.5 py-3 text-sm text-muted-foreground hover:text-foreground">
+                  Alias and expiry
+                </summary>
+                <div className="grid gap-5 border-t border-border p-3.5 sm:grid-cols-2">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium" htmlFor={aliasId}>
+                      Alias (optional)
+                    </label>
+                    <input
+                      id={aliasId}
+                      name="alias"
+                      value={alias}
+                      onChange={(e) => setAlias(e.target.value)}
+                      className={fieldClass}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium" htmlFor={expiryId}>
+                      Expires in seconds (optional)
+                    </label>
+                    <input
+                      id={expiryId}
+                      name="expires_in"
+                      type="number"
+                      min={60}
+                      max={157680000}
+                      value={expiresIn}
+                      onChange={(e) => setExpiresIn(e.target.value)}
+                      className={fieldClass}
+                    />
+                  </div>
+                </div>
+              </details>
+            </div>
+            {error ? (
+              <p className="mt-5 bg-destructive-soft px-3 py-2 text-sm text-destructive" role="alert">
+                {error}
+              </p>
+            ) : null}
+          </div>
+        </form>
+
+        {created ? (
+          <div className="mt-8 border border-brand/40 bg-card p-6 glow">
+            <p className="text-xs font-medium tracking-[0.04em] text-muted-foreground uppercase">Short URL</p>
+            <p className="mt-3 break-all font-mono text-title text-brand glow-text">{created.short_url}</p>
+            <button
+              type="button"
+              className="mt-5 inline-flex h-9 items-center border border-input px-3.5 text-sm hover:border-brand hover:glow"
+              onClick={() => void copy(created.short_url)}
+            >
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+        ) : null}
+
+        {selected ? (
+          <div className="mt-8">
+            <LinkPage
+              code={selected}
+              onBack={onClear}
+              onDeleted={(code) => {
+                if (created?.short_code === code) {
+                  setCreated(null)
+                }
+                onClear()
+              }}
+            />
+          </div>
+        ) : null}
+    </Chrome>
+  )
+}

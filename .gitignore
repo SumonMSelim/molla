@@ -27,6 +27,7 @@ go.work.sum
 
 # Web
 node_modules/
+web/node_modules/
 web/dist/
 
 # Build artifacts

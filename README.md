@@ -18,7 +18,7 @@ molla is an open-source URL-shortening service written in Go, with AWS as its fi
 
 ## Installation
 
-Clone and verify the scaffold:
+Clone and verify:
 
 ```sh
 git clone https://github.com/SumonMSelim/molla.git
@@ -26,8 +26,6 @@ cd molla
 make build
 make test
 ```
-
-The repository currently provides a buildable project skeleton. The API, redirect service, storage adapters, and infrastructure modules are not implemented yet.
 
 ## Local development
 
@@ -51,7 +49,12 @@ make lint GOFMT=gofmt
 make tf-check TF=terraform
 ```
 
-There is no runnable local server yet; `cmd/server` and the AWS entrypoints are bootstrap stubs.
+Local API + UI (see `web/README.md`):
+
+```sh
+make dev-api          # Go net/http on :8080, in-memory adapters
+cd web && npm ci && npm run dev   # Vite at /app/, proxies /api
+```
 
 ## Deployment
 
@@ -74,6 +77,7 @@ internal/platform/      interfaces shared by handlers and adapters
 internal/handlers/      HTTP handlers
 internal/adapters/      memory, Redis, and AWS integrations
 infra/terraform/aws/    AWS infrastructure
+web/                    static SPA (Vite) served at /app/*
 ```
 
 ## Contributing
