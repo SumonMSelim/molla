@@ -11,7 +11,7 @@ GO    ?= $(DOCKER_GO) go
 GOFMT ?= $(DOCKER_GO) gofmt
 TF    ?= docker run --rm -v "$(CURDIR)/$(TF_DIR)":/w -w /w $(TF_IMAGE)
 
-.PHONY: build test coverage vet lint bench tf-check
+.PHONY: build test coverage vet lint bench tf-check build-lambda
 
 build:
 	$(GO) build ./...
@@ -32,6 +32,17 @@ lint:
 
 bench:
 	$(GO) test ./... -run '^$$' -bench=. -benchmem
+
+build-lambda:
+	@mkdir -p dist
+	@for c in api redirect invalidate aggregate; do \
+	  echo "lambda $$c"; \
+	  docker run --rm -v "$(CURDIR)":/src -w /src \
+	    -v molla-mod:/go/pkg/mod -v molla-build:/root/.cache/go-build \
+	    -e GOFLAGS=-buildvcs=false -e GOOS=linux -e GOARCH=arm64 -e CGO_ENABLED=0 \
+	    $(GO_IMAGE) go build -trimpath -ldflags='-s -w' -o dist/$$c/bootstrap ./cmd/aws/$$c; \
+	  (cd dist/$$c && zip -FS -q ../$$c.zip bootstrap); \
+	done
 
 # fmt, init without a backend, validate: touches no cloud account.
 tf-check:
