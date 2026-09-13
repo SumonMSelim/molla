@@ -58,15 +58,24 @@ cd web && npm ci && npm run dev   # Vite at /app/, proxies /api
 
 ## Deployment
 
-Production deployment is not available yet. `infra/terraform/aws` currently pins the supported Terraform and AWS provider versions; deployable modules and environment roots will be added incrementally.
-
-Current infrastructure validation:
+Lambdas and Terraform modules are in-repo. **Operators** apply with short-lived AWS credentials after a reviewed plan. CI only runs `make tf-check` (fmt + init `-backend=false` + validate). Never plan/apply from CI.
 
 ```sh
-make tf-check
+make build-lambda          # dist/{api,redirect,invalidate,aggregate}.zip
+make web-build             # web/dist for the /app/* SPA
+make tf-check              # no cloud account
 ```
 
-Terraform plan and apply instructions will be added only after the infrastructure is executable and tested.
+From `infra/terraform/aws/envs/dev` (or `prod`): configure the S3 backend, supply tfvars (`permutation_key`, `privacy_key`, `redis_auth_token`, `admin_principal_arns`), `terraform init`, reviewed `plan`, then `apply`. Point `artifact_dir` at `dist` for real zips (placeholders exist only so validate works).
+
+After apply:
+
+1. Seed DynamoDB credentials and the matching API Gateway key — `go run ./cmd/admin issue` (see `docs/RUNBOOK.md`).
+2. `aws s3 sync web/dist s3://$(terraform output -raw ui_bucket) --delete`
+3. Invalidate CloudFront `/app/*`
+4. ACM/DNS for mol.la → distribution domain (`terraform output distribution_domain`)
+
+Load envelope (operator workstation, not CI, not prod-by-default): `test/load/`. Full procedures: `docs/RUNBOOK.md`.
 
 ## Project layout
 
@@ -78,6 +87,7 @@ internal/handlers/      HTTP handlers
 internal/adapters/      memory, Redis, and AWS integrations
 infra/terraform/aws/    AWS infrastructure
 web/                    static SPA (Vite) served at /app/*
+test/load/              k6 scripts (operator only)
 ```
 
 ## Contributing

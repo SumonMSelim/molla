@@ -4,11 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
+
+	"github.com/SumonMSelim/molla/internal/adapters/aws/ddbfake"
 )
+
+func withFakeAWS(t *testing.T) {
+	t.Helper()
+	srv := httptest.NewServer(ddbfake.New())
+	t.Cleanup(srv.Close)
+	t.Setenv("MOLLA_AWS_ENDPOINT", srv.URL)
+	t.Setenv("MOLLA_INVALIDATE_FUNCTION", "molla-invalidate")
+}
 
 func TestNewHandlerRequiresPermutationKey(t *testing.T) {
 	t.Setenv("MOLLA_PERMUTATION_KEY", "")
@@ -18,6 +29,7 @@ func TestNewHandlerRequiresPermutationKey(t *testing.T) {
 }
 
 func TestLambdaAdapterUnauthorized(t *testing.T) {
+	withFakeAWS(t)
 	t.Setenv("MOLLA_PERMUTATION_KEY", "molla-slice-1-fixed-test-key")
 	t.Setenv("MOLLA_PUBLIC_BASE", "https://mol.la")
 	handler, err := newHandler()
@@ -48,6 +60,7 @@ func TestLambdaAdapterUnauthorized(t *testing.T) {
 }
 
 func TestLambdaAdapterInvalidKey(t *testing.T) {
+	withFakeAWS(t)
 	t.Setenv("MOLLA_PERMUTATION_KEY", "molla-slice-1-fixed-test-key")
 	handler, err := newHandler()
 	if err != nil {
@@ -68,6 +81,7 @@ func TestLambdaAdapterInvalidKey(t *testing.T) {
 }
 
 func TestRunAPI(t *testing.T) {
+	withFakeAWS(t)
 	t.Setenv("MOLLA_PERMUTATION_KEY", "molla-slice-1-fixed-test-key")
 	started := false
 	if err := runAPI(func(any) { started = true }); err != nil {

@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 
+	"github.com/SumonMSelim/molla/internal/adapters/aws/ddbfake"
 	"github.com/SumonMSelim/molla/internal/platform"
 )
 
@@ -51,5 +53,15 @@ func TestHandleEventPartialBatchFailure(t *testing.T) {
 	}
 	if store.calls != 2 {
 		t.Fatalf("increment calls = %d", store.calls)
+	}
+}
+
+func TestNewStatsStoreUsesEndpoint(t *testing.T) {
+	srv := httptest.NewServer(ddbfake.New())
+	t.Cleanup(srv.Close)
+	t.Setenv("MOLLA_AWS_ENDPOINT", srv.URL)
+	store, err := newStatsStore()
+	if err != nil || store == nil {
+		t.Fatalf("store = %v err = %v", store, err)
 	}
 }

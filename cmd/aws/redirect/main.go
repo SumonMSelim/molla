@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"log"
 	"net/http"
@@ -12,9 +13,16 @@ import (
 	"time"
 
 	"github.com/aws/aws-lambda-go/lambda"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	awskinesis "github.com/aws/aws-sdk-go-v2/service/kinesis"
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
+	goredis "github.com/redis/go-redis/v9"
 
-	"github.com/SumonMSelim/molla/internal/adapters/memory"
+	awsadapter "github.com/SumonMSelim/molla/internal/adapters/aws"
+	ddb "github.com/SumonMSelim/molla/internal/adapters/aws/dynamodb"
+	"github.com/SumonMSelim/molla/internal/adapters/aws/kinesis"
+	redisadapter "github.com/SumonMSelim/molla/internal/adapters/redis"
 	"github.com/SumonMSelim/molla/internal/handlers"
 )
 
@@ -27,10 +35,25 @@ func newHandler() (http.Handler, error) {
 	if key == "" {
 		return nil, errors.New("MOLLA_PRIVACY_KEY required")
 	}
+	addr := os.Getenv("MOLLA_REDIS_ADDR")
+	if addr == "" {
+		return nil, errors.New("MOLLA_REDIS_ADDR required")
+	}
+	stream := os.Getenv("MOLLA_CLICK_STREAM")
+	if stream == "" {
+		return nil, errors.New("MOLLA_CLICK_STREAM required")
+	}
+	cfg, err := awsadapter.RuntimeConfig(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	ddbClient := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) { o.Retryer = awssdk.NopRetryer{} })
+	kinesisClient := awskinesis.NewFromConfig(cfg, func(o *awskinesis.Options) { o.Retryer = awssdk.NopRetryer{} })
+	cache := redisadapter.NewCache(goredis.NewClient(redisadapter.OptionsFromEnv(addr)))
 	return handlers.NewRedirect(handlers.RedirectDeps{
-		Store:      memory.NewLinkStore(),
-		Cache:      memory.NewCache(),
-		Publisher:  &memory.EventPublisher{},
+		Store:      ddb.NewLinkStore(ddbClient),
+		Cache:      cache,
+		Publisher:  kinesis.NewPublisher(kinesisClient, stream),
 		Clock:      liveClock{},
 		PrivacyKey: []byte(key),
 	}), nil

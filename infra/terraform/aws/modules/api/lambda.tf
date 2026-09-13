@@ -68,6 +68,8 @@ resource "aws_lambda_function" "redirect" {
     variables = {
       MOLLA_PRIVACY_KEY  = var.privacy_key
       MOLLA_REDIS_ADDR   = "${aws_elasticache_replication_group.redis.primary_endpoint_address}:6379"
+      MOLLA_REDIS_AUTH   = var.redis_auth_token
+      MOLLA_REDIS_TLS    = "1"
       MOLLA_CLICK_STREAM = var.stream_name
       MOLLA_LINKS_TABLE  = var.table_names["links"]
     }
@@ -107,6 +109,8 @@ resource "aws_lambda_function" "invalidate" {
   environment {
     variables = {
       MOLLA_REDIS_ADDR = "${aws_elasticache_replication_group.redis.primary_endpoint_address}:6379"
+      MOLLA_REDIS_AUTH = var.redis_auth_token
+      MOLLA_REDIS_TLS  = "1"
     }
   }
   depends_on = [aws_cloudwatch_log_group.invalidate]

@@ -66,5 +66,7 @@ module "edge" {
   redirect_function_url = module.api.redirect_function_url
   redirect_function_arn = module.api.redirect_function_arn
   enable_waf            = false
+  domain_name           = var.domain_name
+  hosted_zone_id        = var.hosted_zone_id
   tags                  = local.tags
 }

@@ -31,7 +31,7 @@ func NewIDAllocator(client clientAPI, region string, blockSize int64) *IDAllocat
 	if blockSize <= 0 {
 		blockSize = defaultBlockSize
 	}
-	return &IDAllocator{client: client, table: tableCounters, region: region, blockSize: blockSize}
+	return &IDAllocator{client: client, table: countersTable(), region: region, blockSize: blockSize}
 }
 
 func (a *IDAllocator) Lease(ctx context.Context) (int64, error) {

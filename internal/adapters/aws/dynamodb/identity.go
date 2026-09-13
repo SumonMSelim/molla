@@ -18,7 +18,7 @@ type IdentityStore struct {
 }
 
 func NewIdentityStore(client clientAPI) *IdentityStore {
-	return &IdentityStore{client: client, table: tableCredentials}
+	return &IdentityStore{client: client, table: credentialsTable()}
 }
 
 func (s *IdentityStore) Store(ctx context.Context, token string, cred platform.Credential) error {

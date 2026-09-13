@@ -1,5 +1,7 @@
 # Local implementation plans
-docs/
+docs/*
+!docs/RUNBOOK.md
+!docs/WELL_ARCHITECTED.md
 
 # Secrets and local configuration
 .env
