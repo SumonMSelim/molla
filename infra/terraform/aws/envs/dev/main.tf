@@ -65,8 +65,8 @@ module "edge" {
   api_gateway_id        = module.api.rest_api_id
   redirect_function_url = module.api.redirect_function_url
   redirect_function_arn = module.api.redirect_function_arn
-  enable_waf            = false
   domain_name           = var.domain_name
-  hosted_zone_id        = var.hosted_zone_id
+  cloudflare_zone_id    = var.cloudflare_zone_id
+  origin_verify_secret  = var.origin_verify_secret
   tags                  = local.tags
 }

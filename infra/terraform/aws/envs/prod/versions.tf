@@ -6,6 +6,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 6.64"
     }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 5.0"
+    }
   }
 }
 
@@ -15,3 +19,6 @@ provider "aws" {
     tags = local.tags
   }
 }
+
+# Authenticates with CLOUDFLARE_API_TOKEN (scope: Zone:DNS:Edit on the mol.la zone).
+provider "cloudflare" {}

@@ -23,20 +23,23 @@ variable "redirect_function_arn" {
   type = string
 }
 
-variable "enable_waf" {
-  type        = bool
-  description = "Production enables WAF; development disables it."
-}
-
 variable "domain_name" {
   type        = string
-  description = "Public hostname. Empty skips custom ACM/Route53."
+  description = "Public hostname. Empty skips custom ACM/Cloudflare DNS."
   default     = ""
 }
 
-variable "hosted_zone_id" {
-  type    = string
-  default = ""
+variable "cloudflare_zone_id" {
+  type        = string
+  description = "Cloudflare zone for ACM validation and the apex CNAME. Required when domain_name is set."
+  default     = ""
+}
+
+variable "origin_verify_secret" {
+  type        = string
+  description = "Shared secret Cloudflare adds as X-Origin-Verify; CloudFront rejects requests without it. Required when domain_name is set."
+  sensitive   = true
+  default     = ""
 }
 
 variable "log_retention_days" {

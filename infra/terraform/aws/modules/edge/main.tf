@@ -125,6 +125,15 @@ resource "aws_cloudfront_response_headers_policy" "security" {
   }
 }
 
+resource "aws_cloudfront_function" "viewer_request" {
+  count   = var.domain_name == "" ? 0 : 1
+  name    = "${var.name_prefix}-viewer-request"
+  runtime = "cloudfront-js-2.0"
+  comment = "Reject requests that did not come through Cloudflare."
+  publish = true
+  code    = templatefile("${path.module}/viewer_request.js.tftpl", { secret = var.origin_verify_secret })
+}
+
 locals {
   redirect_domain = replace(replace(var.redirect_function_url, "https://", ""), "/", "")
   api_domain      = "${var.api_gateway_id}.execute-api.${data.aws_region.current.region}.amazonaws.com"
@@ -136,7 +145,6 @@ resource "aws_cloudfront_distribution" "this" {
   comment             = var.name_prefix
   price_class         = "PriceClass_100"
   aliases             = var.domain_name == "" ? [] : [var.domain_name]
-  web_acl_id          = var.enable_waf ? aws_wafv2_web_acl.edge[0].arn : null
   default_root_object = ""
   tags                = var.tags
 
@@ -178,6 +186,13 @@ resource "aws_cloudfront_distribution" "this" {
     compress                   = true
     cache_policy_id            = aws_cloudfront_cache_policy.redirect.id
     response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
+    dynamic "function_association" {
+      for_each = aws_cloudfront_function.viewer_request
+      content {
+        event_type   = "viewer-request"
+        function_arn = function_association.value.arn
+      }
+    }
   }
 
   ordered_cache_behavior {
@@ -190,6 +205,13 @@ resource "aws_cloudfront_distribution" "this" {
     cache_policy_id            = aws_cloudfront_cache_policy.api.id
     origin_request_policy_id   = aws_cloudfront_origin_request_policy.api.id
     response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
+    dynamic "function_association" {
+      for_each = aws_cloudfront_function.viewer_request
+      content {
+        event_type   = "viewer-request"
+        function_arn = function_association.value.arn
+      }
+    }
   }
 
   ordered_cache_behavior {
@@ -201,6 +223,13 @@ resource "aws_cloudfront_distribution" "this" {
     compress                   = true
     cache_policy_id            = aws_cloudfront_cache_policy.redirect.id
     response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
+    dynamic "function_association" {
+      for_each = aws_cloudfront_function.viewer_request
+      content {
+        event_type   = "viewer-request"
+        function_arn = function_association.value.arn
+      }
+    }
   }
 
   restrictions {

@@ -66,14 +66,14 @@ make web-build             # web/dist for the /app/* SPA
 make tf-check              # no cloud account
 ```
 
-From `infra/terraform/aws/envs/dev` (or `prod`): configure the S3 backend, supply tfvars (`permutation_key`, `privacy_key`, `redis_auth_token`, `admin_principal_arns`), `terraform init`, reviewed `plan`, then `apply`. Point `artifact_dir` at `dist` for real zips (placeholders exist only so validate works).
+From `infra/terraform/aws/envs/dev` (or `prod`): configure the S3 backend, supply tfvars (`permutation_key`, `privacy_key`, `redis_auth_token`, `admin_principal_arns`, `origin_verify_secret`, `domain_name`, `cloudflare_zone_id`), export `CLOUDFLARE_API_TOKEN`, `terraform init`, reviewed `plan`, then `apply`. Point `artifact_dir` at `dist` for real zips (placeholders exist only so validate works).
 
 After apply:
 
 1. Seed DynamoDB credentials and the matching API Gateway key — `go run ./cmd/admin issue` (see `docs/RUNBOOK.md`).
 2. `aws s3 sync web/dist s3://$(terraform output -raw ui_bucket) --delete`
 3. Invalidate CloudFront `/app/*`
-4. ACM/DNS for mol.la → distribution domain (`terraform output distribution_domain`)
+4. DNS is applied by Terraform: mol.la is a proxied Cloudflare CNAME to the distribution. Cloudflare is the firewall; CloudFront only accepts requests carrying the Cloudflare-stamped `X-Origin-Verify` header.
 
 Load envelope (operator workstation, not CI, not prod-by-default): `test/load/`. Full procedures: `docs/RUNBOOK.md`.
 

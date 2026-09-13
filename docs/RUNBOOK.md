@@ -16,12 +16,16 @@ Load tests run only from an operator workstation against **dev** or a dedicated 
 
 1. Create the Terraform state bucket and DynamoDB lock table named in `infra/terraform/aws/envs/*/backend.tf`.
 2. `make build-lambda` then pass `-var artifact_dir=../../../../../dist` (from the env dir) or copy zips next to the env as agreed by the pipeline.
-3. Set tfvars: `permutation_key`, `privacy_key`, `redis_auth_token` (≥16 chars), `admin_principal_arns`. Prod also needs alarm email, budget, and central trail/config/guardduty IDs.
+3. Set tfvars: `permutation_key`, `privacy_key`, `redis_auth_token` (≥16 chars), `admin_principal_arns`, `origin_verify_secret` (≥32 random chars). Prod also needs alarm email, budget, and central trail/config/guardduty IDs.
 4. `terraform init` and reviewed `terraform plan` in `envs/dev`, then `apply` only with short-lived credentials and explicit approval.
-5. ACM + DNS: set `domain_name` (e.g. `mol.la`) and `hosted_zone_id` in tfvars. Empty `domain_name` keeps the CloudFront hostname. Prod WAF is on.
+5. ACM + DNS: set `domain_name` (`mol.la`) and `cloudflare_zone_id` in tfvars and export `CLOUDFLARE_API_TOKEN` (scopes: Zone:DNS:Edit, Zone:Zone Settings:Edit, Zone:Transform Rules:Edit on the mol.la zone). Terraform creates the ACM validation records, the proxied apex CNAME to CloudFront, sets SSL to Full (strict), and a Transform Rule that stamps `X-Origin-Verify`. Empty `domain_name` keeps the CloudFront hostname with no origin check. Cloudflare WAF/rate limiting is the firewall; there is no AWS WAF.
 6. Seed the first developer key (below).
 7. `make web-build` and `aws s3 sync web/dist s3://$(terraform output -raw ui_bucket) --delete`. Invalidate CloudFront `/app/*`.
-8. Confirm `GET https://mol.la/app/` and `POST /api/v1/links` with both the API Gateway key and `X-Api-Key`.
+8. Confirm `GET https://mol.la/app/` and `POST /api/v1/links` with both the API Gateway key and `X-Api-Key`. Confirm `GET https://<distribution>.cloudfront.net/` returns 403 (Cloudflare bypass blocked).
+
+## Rotate the origin secret
+
+Change `origin_verify_secret` and apply. Cloudflare's rule and the CloudFront function update in one plan; expect a few seconds of 403s while the function propagates. Rotate if the value leaks (CloudFront function code is readable by anyone with `cloudfront:DescribeFunction`).
 
 ## Rotate developer keys
 
@@ -66,6 +70,7 @@ Single-region launch. CloudFront may still serve cached 302s until TTL. Writes a
 - Page: origin 5xx, Lambda errors, DynamoDB user errors, Redis CPU/evictions, Kinesis iterator age.
 - Failover is a **new region deploy**, not automatic. Restore PITR into the surviving region only as a documented emergency; permutation/privacy keys and DNS cutover are required.
 - Do not claim multi-region RTO until a second region exists.
+- Cloudflare outage: DNS and proxy fail together; there is no direct path to CloudFront by design.
 
 ## Abort a load or canary
 

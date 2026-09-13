@@ -1,0 +1,13 @@
+function handler(event) {
+  var request = event.request;
+  var header = request.headers['x-origin-verify'];
+  if (!header || header.value !== '${secret}') {
+    return {
+      statusCode: 403,
+      statusDescription: 'Forbidden',
+      headers: { 'cache-control': { value: 'no-store' } }
+    };
+  }
+  delete request.headers['x-origin-verify'];
+  return request;
+}
