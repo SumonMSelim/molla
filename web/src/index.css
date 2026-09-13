@@ -1,0 +1,97 @@
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/fira-code";
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: "Inter Variable", sans-serif;
+  --font-mono: "Fira Code Variable", ui-monospace, monospace;
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-text: var(--brand-text);
+  --color-brand-soft: var(--brand-soft);
+  --color-glow: var(--glow);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --text-display: clamp(2.25rem, 8vw, 3.75rem);
+  --text-display--line-height: 1.05;
+  --text-display--letter-spacing: -0.04em;
+  --text-title: 1.5rem;
+  --text-title--line-height: 2rem;
+  --text-title--letter-spacing: -0.02em;
+  --text-section: 1rem;
+  --text-section--line-height: 1.5rem;
+  --text-prose: 0.9375rem;
+  --text-prose--line-height: 1.5rem;
+  --text-code: 0.8125rem;
+  --text-code--line-height: 1.25rem;
+}
+
+:root {
+  color-scheme: dark;
+  --background: oklch(0.13 0.004 150);
+  --foreground: oklch(0.93 0 0);
+  --card: oklch(0.17 0.005 150);
+  --card-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-soft: oklch(0.3 0.08 25);
+  --border: oklch(0.3 0.04 150);
+  --input: oklch(0.42 0.05 150);
+  --ring: oklch(0.806 0.241 147);
+  --radius: 0px;
+  --brand: oklch(0.806 0.241 147);
+  --brand-foreground: oklch(0.13 0.02 150);
+  --brand-text: oklch(0.806 0.241 147);
+  --brand-soft: oklch(0.26 0.07 150);
+  --glow: oklch(0.806 0.241 147 / 0.45);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@utility bg-dot-grid {
+  background-image: radial-gradient(color-mix(in oklch, var(--brand) 18%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+@utility glow {
+  box-shadow: 0 0 20px var(--glow), 0 0 2px var(--glow);
+}
+
+@utility glow-text {
+  text-shadow: 0 0 10px var(--glow), 0 0 20px var(--glow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
