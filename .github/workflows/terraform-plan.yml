@@ -1,0 +1,84 @@
+name: Terraform plan
+
+# Read-only: assumes the plan-only OIDC role and posts the plan diff as a PR
+# comment. Never applies. Real apply is deploy.yml, gated by a tag push or a
+# manual dispatch through the production environment.
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "infra/terraform/aws/**"
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+concurrency:
+  group: tf-plan-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  TF_DIR: infra/terraform/aws/envs/prod
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.16.2"
+
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Init
+        working-directory: ${{ env.TF_DIR }}
+        run: terraform init -input=false
+
+      - name: Plan
+        id: plan
+        working-directory: ${{ env.TF_DIR }}
+        continue-on-error: true
+        run: |
+          terraform plan -no-color -input=false \
+            -var 'admin_principal_arns=${{ vars.ADMIN_PRINCIPAL_ARNS }}' \
+            -var "alarm_email=${{ vars.ALARM_EMAIL }}" \
+            -var "domain_name=${{ vars.DOMAIN_NAME }}" \
+            -var "cloudflare_zone_id=${{ vars.CLOUDFLARE_ZONE_ID }}" \
+            -var "github_repository=${{ github.repository }}" \
+            -out=tfplan | tee plan.txt
+
+      - name: Comment plan on PR
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs')
+            const plan = fs.readFileSync('${{ env.TF_DIR }}/plan.txt', 'utf8')
+            const truncated = plan.length > 60000 ? plan.slice(0, 60000) + '\n... (truncated)' : plan
+            const body = [
+              '### Terraform plan (envs/prod)',
+              '',
+              '```hcl',
+              truncated,
+              '```',
+            ].join('\n')
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number,
+            })
+            const existing = comments.find(c => c.body.startsWith('### Terraform plan (envs/prod)'))
+            if (existing) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body })
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body })
+            }
+
+      - name: Fail if plan errored
+        if: steps.plan.outcome == 'failure'
+        run: exit 1

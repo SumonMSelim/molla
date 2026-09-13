@@ -97,6 +97,14 @@ resource "aws_ssm_parameter" "privacy_key" {
   tags   = var.tags
 }
 
+resource "aws_ssm_parameter" "redis_auth_token" {
+  name   = "/molla/${var.name_prefix}/redis_auth_token"
+  type   = "SecureString"
+  key_id = var.kms_key_arn
+  value  = var.redis_auth_token
+  tags   = var.tags
+}
+
 resource "aws_cloudwatch_metric_alarm" "api_5xx" {
   alarm_name          = "${var.name_prefix}-api-5xx"
   alarm_description   = "Owner: platform. Action: inspect API Lambda and DynamoDB."
