@@ -63,12 +63,12 @@ export function CreatePage({ selected, onOpen, onClear }: CreatePageProps) {
 
   return (
     <Chrome>
-        <form onSubmit={onSubmit} className="relative pt-5">
+        <form onSubmit={onSubmit} className="relative animate-fade-up pt-5 [animation-delay:80ms]">
           <div className="absolute top-0 left-6 z-10 border border-b-0 border-border bg-card px-4 py-2 text-sm font-medium">
             Short link
           </div>
           <div className="border border-border bg-card px-6 pb-6 pt-10 sm:px-8 sm:pb-8">
-            <h1 className="text-title font-semibold">Shorten a long link</h1>
+            <h1 className="animate-fade-up text-title font-semibold [animation-delay:140ms]">Shorten a long link</h1>
             <div className="mt-6 flex flex-col gap-2">
               <label className="text-sm font-medium text-brand-text" htmlFor={urlId}>
                 Long URL
@@ -137,7 +137,8 @@ export function CreatePage({ selected, onOpen, onClear }: CreatePageProps) {
         </form>
 
         {created ? (
-          <div className="mt-8 border border-brand/40 bg-card p-6 glow">
+          <div className="relative mt-8 animate-fade-up overflow-hidden border border-brand/40 bg-card p-6 glow">
+            <div className="pointer-events-none absolute inset-0 animate-sheen" />
             <p className="text-xs font-medium tracking-[0.04em] text-muted-foreground uppercase">Short URL</p>
             <p className="mt-3 break-all font-mono text-title text-brand glow-text">{created.short_url}</p>
             <button

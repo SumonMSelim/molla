@@ -85,6 +85,57 @@
   text-shadow: 0 0 10px var(--glow), 0 0 20px var(--glow);
 }
 
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ambient-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes sheen-sweep {
+  from {
+    background-position: -150% 0;
+  }
+  to {
+    background-position: 250% 0;
+  }
+}
+
+@utility animate-fade-up {
+  animation: fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@utility animate-ambient-pulse {
+  animation: ambient-pulse 6s ease-in-out infinite;
+}
+
+@utility animate-sheen {
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in oklch, var(--brand) 35%, transparent) 50%,
+    transparent 70%
+  );
+  background-size: 250% 100%;
+  animation: sheen-sweep 2.4s ease-in-out 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

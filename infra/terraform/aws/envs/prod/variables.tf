@@ -4,18 +4,24 @@ variable "region" {
 }
 
 variable "permutation_key" {
-  type      = string
-  sensitive = true
+  type        = string
+  description = "Feistel permutation key. Empty generates and stores one in SSM on first apply."
+  sensitive   = true
+  default     = ""
 }
 
 variable "privacy_key" {
-  type      = string
-  sensitive = true
+  type        = string
+  description = "Click source-IP hashing key. Empty generates and stores one in SSM on first apply."
+  sensitive   = true
+  default     = ""
 }
 
 variable "redis_auth_token" {
-  type      = string
-  sensitive = true
+  type        = string
+  description = "ElastiCache Redis AUTH token. Empty generates and stores one in SSM on first apply."
+  sensitive   = true
+  default     = ""
 }
 
 variable "admin_principal_arns" {
@@ -76,7 +82,12 @@ variable "cloudflare_zone_id" {
 
 variable "origin_verify_secret" {
   type        = string
-  description = "Shared secret Cloudflare stamps on origin requests. Required when domain_name is set."
+  description = "Shared secret Cloudflare stamps on origin requests. Empty generates one when domain_name is set."
   sensitive   = true
   default     = ""
+}
+
+variable "github_repository" {
+  type        = string
+  description = "GitHub repo as owner/name that may assume the CI plan/apply roles via OIDC, e.g. SumonMSelim/molla."
 }

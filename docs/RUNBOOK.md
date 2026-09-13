@@ -1,6 +1,11 @@
 # Operations runbook
 
-Operator procedures for mol.la on AWS. CI never plans or applies Terraform and never runs k6 against any environment.
+Operator procedures for mol.la on AWS. `ci.yml` never plans or applies
+Terraform and never runs k6 against any environment; it only builds and
+tests. Terraform plan and apply run in `terraform-plan.yml` (every PR
+touching `infra/terraform/aws`, read-only) and `deploy.yml` (a `vX.Y.Z` tag
+push or a manual `workflow_dispatch`, never a plain merge to `main`), both
+gated by the `production` GitHub Environment's required reviewer.
 
 ## Launch SLOs
 
@@ -12,15 +17,34 @@ Operator procedures for mol.la on AWS. CI never plans or applies Terraform and n
 
 Load tests run only from an operator workstation against **dev** or a dedicated load account. Never default `BASE_URL` to production.
 
-## Deploy (first time)
+## Deploy (first time, by hand -- bootstraps GitHub Actions)
 
-1. Create the Terraform state bucket and DynamoDB lock table named in `infra/terraform/aws/envs/*/backend.tf`.
-2. `make build-lambda` then pass `-var artifact_dir=../../../../../dist` (from the env dir) or copy zips next to the env as agreed by the pipeline.
-3. Set tfvars: `permutation_key`, `privacy_key`, `redis_auth_token` (≥16 chars), `admin_principal_arns`, `origin_verify_secret` (≥32 random chars). Prod also needs alarm email, budget, and central trail/config/guardduty IDs.
-4. `terraform init` and reviewed `terraform plan` in `envs/dev`, then `apply` only with short-lived credentials and explicit approval.
+`deploy.yml` authenticates to AWS by assuming an IAM role via OIDC, and that
+role is itself created by this Terraform configuration (`modules/ci`). The
+very first apply has to happen from an operator workstation with short-lived
+credentials; every apply after that can run from Actions.
+
+1. Create the Terraform state bucket and DynamoDB lock table named in `infra/terraform/aws/envs/prod/backend.tf`.
+2. `make build-lambda` then pass `-var artifact_dir=../../../../../dist` (from `envs/prod`) or copy zips next to the env.
+3. `permutation_key`, `privacy_key`, `redis_auth_token`, and `origin_verify_secret` are optional: leave them unset and Terraform generates and stores random values on first apply (see `random_password` resources in `envs/prod/main.tf`). Set them only to pin a specific value.
+4. Set tfvars: `admin_principal_arns`, `github_repository` (`SumonMSelim/molla`). Prod also needs `alarm_email`, `budget_limit`, and central trail/config/guardduty IDs.
 5. ACM + DNS: set `domain_name` (`mol.la`) and `cloudflare_zone_id` in tfvars and export `CLOUDFLARE_API_TOKEN` (scopes: Zone:DNS:Edit, Zone:Zone Settings:Edit, Zone:Transform Rules:Edit on the mol.la zone). Terraform creates the ACM validation records, the proxied apex CNAME to CloudFront, sets SSL to Full (strict), and a Transform Rule that stamps `X-Origin-Verify`. Empty `domain_name` keeps the CloudFront hostname with no origin check. Cloudflare WAF/rate limiting is the firewall; there is no AWS WAF.
-6. `make web-build` and `aws s3 sync web/dist s3://$(terraform output -raw ui_bucket)/app --delete`. Invalidate CloudFront `/app/*`.
-7. Confirm `GET https://mol.la/app/` and `POST /api/v1/links` (no auth header needed). Confirm `GET https://<distribution>.cloudfront.net/` returns 403 (Cloudflare bypass blocked).
+6. `terraform init` and reviewed `terraform plan` in `envs/prod`, then `apply` with short-lived credentials and explicit approval.
+7. `make web-build` and `aws s3 sync web/dist s3://$(terraform output -raw ui_bucket)/app --delete`. Invalidate CloudFront `/app/*`.
+8. Confirm `GET https://mol.la/app/` and `POST /api/v1/links` (no auth header needed -- create and stats are public). Confirm `GET https://<distribution>.cloudfront.net/` returns 403 (Cloudflare bypass blocked).
+9. Wire up GitHub Actions for every deploy after this one (see below).
+
+## GitHub Actions setup (one-time, after the first manual apply)
+
+1. In the repo's Settings → Environments, create `production` with a required reviewer. Every `terraform-plan.yml` and `deploy.yml` run waits for that approval before the OIDC role can be assumed.
+2. Set these as Environment **variables** (not secrets -- OIDC needs no long-lived AWS credentials):
+   - `AWS_REGION` -- `us-east-1`.
+   - `AWS_PLAN_ROLE_ARN` -- `terraform output -raw gha_plan_role_arn`.
+   - `AWS_APPLY_ROLE_ARN` -- `terraform output -raw gha_apply_role_arn`.
+   - `ADMIN_PRINCIPAL_ARNS` -- HCL list syntax, e.g. `["arn:aws:iam::123456789012:role/ops"]` (passed straight to `-var`).
+   - `ALARM_EMAIL`, `DOMAIN_NAME` (`mol.la`), `CLOUDFLARE_ZONE_ID`.
+3. Set `CLOUDFLARE_API_TOKEN` as an Environment **secret** (Cloudflare has no OIDC federation, so this is a real static credential, scoped as in step 5 above).
+4. Deploy by pushing a `vX.Y.Z` tag, or by running `deploy.yml` manually via `workflow_dispatch` (type `deploy` to confirm). A plain merge to `main` never triggers a deploy.
 
 ## Rotate the origin secret
 
