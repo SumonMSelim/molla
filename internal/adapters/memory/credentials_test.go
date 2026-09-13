@@ -87,3 +87,29 @@ func TestCredentialStoreRejectsInvalidAndRevoked(t *testing.T) {
 		t.Fatalf("revoked Resolve() error = %v", err)
 	}
 }
+
+func TestCredentialStoreRevoke(t *testing.T) {
+	store := NewCredentialStore()
+	ctx := context.Background()
+	issued := time.Unix(1_700_000_000, 0).UTC()
+	token := "dev-test-token"
+	cred := platform.Credential{
+		ActorID: "actor", OwnerID: "owner", Status: platform.CredentialActive,
+		IssuedAt: issued, ExpiresAt: issued.Add(24 * time.Hour),
+	}
+	if err := store.Store(ctx, token, cred); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Resolve(ctx, token, issued); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Revoke(ctx, platform.HashToken(token)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Resolve(ctx, token, issued); !errors.Is(err, platform.ErrUnauthorized) {
+		t.Fatalf("revoked Resolve() error = %v", err)
+	}
+	if err := store.Revoke(ctx, platform.HashToken("never-issued")); !errors.Is(err, platform.ErrNotFound) {
+		t.Fatalf("unknown Revoke() error = %v", err)
+	}
+}

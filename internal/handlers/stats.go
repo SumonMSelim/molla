@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/SumonMSelim/molla/internal/adapters/logging"
 	"github.com/SumonMSelim/molla/internal/core"
 	"github.com/SumonMSelim/molla/internal/platform"
 )
@@ -34,6 +35,7 @@ func (a *API) stats(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "NOT_FOUND")
 			return
 		}
+		logging.FromContext(r.Context()).Error("link lookup failed", "short_code", code, "error", err)
 		writeError(w, http.StatusServiceUnavailable, "TEMPORARILY_UNAVAILABLE")
 		return
 	}
@@ -45,6 +47,7 @@ func (a *API) stats(w http.ResponseWriter, r *http.Request) {
 	record, err := a.statsStore.Get(r.Context(), code)
 	if err != nil {
 		if !errors.Is(err, platform.ErrNotFound) {
+			logging.FromContext(r.Context()).Error("stats lookup failed", "short_code", code, "error", err)
 			writeError(w, http.StatusServiceUnavailable, "TEMPORARILY_UNAVAILABLE")
 			return
 		}

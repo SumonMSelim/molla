@@ -76,4 +76,18 @@ func (s *CredentialStore) Resolve(_ context.Context, token string, now time.Time
 	}, nil
 }
 
+// Revoke marks the credential holding hash revoked, reporting ErrNotFound when
+// no such credential exists.
+func (s *CredentialStore) Revoke(_ context.Context, hash string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cred, ok := s.byHash[hash]
+	if !ok {
+		return platform.ErrNotFound
+	}
+	cred.status = platform.CredentialRevoked
+	s.byHash[hash] = cred
+	return nil
+}
+
 var _ platform.CredentialStore = (*CredentialStore)(nil)

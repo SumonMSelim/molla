@@ -2,6 +2,7 @@ package dynamodb
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -81,6 +82,31 @@ func (s *IdentityStore) Resolve(ctx context.Context, token string, now time.Time
 		Role:    platform.RoleDeveloper,
 		OwnerID: stringAttr(out.Item, attrOwnerID),
 	}, nil
+}
+
+// Revoke sets status to revoked for the credential holding hash. The update is
+// conditioned on the item existing; a failed condition maps to ErrNotFound.
+func (s *IdentityStore) Revoke(ctx context.Context, hash string) error {
+	if hash == "" {
+		return platform.ErrNotFound
+	}
+	_, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:           aws.String(s.table),
+		Key:                 map[string]types.AttributeValue{attrTokenHash: avS(hash)},
+		UpdateExpression:    aws.String("SET " + attrStatus + " = :status"),
+		ConditionExpression: aws.String("attribute_exists(" + attrTokenHash + ")"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":status": avS(string(platform.CredentialRevoked)),
+		},
+	})
+	if err != nil {
+		var failed *types.ConditionalCheckFailedException
+		if errors.As(err, &failed) {
+			return platform.ErrNotFound
+		}
+		return mapAWSError(err)
+	}
+	return nil
 }
 
 var _ platform.CredentialStore = (*IdentityStore)(nil)

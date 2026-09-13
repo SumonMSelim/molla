@@ -479,3 +479,40 @@ func TestNewEventID(t *testing.T) {
 		t.Fatalf("event id length = %d", len(id))
 	}
 }
+
+type deadlineGetStore struct {
+	platform.LinkStore
+	deadline    time.Time
+	hasDeadline bool
+}
+
+func (s *deadlineGetStore) Get(ctx context.Context, code string) (platform.Link, error) {
+	s.deadline, s.hasDeadline = ctx.Deadline()
+	return s.LinkStore.Get(ctx, code)
+}
+
+func TestRedirectStoreGetIsBounded(t *testing.T) {
+	now := time.Date(2026, 9, 12, 12, 0, 0, 0, time.UTC)
+	store := memory.NewLinkStore()
+	if _, err := store.Create(context.Background(), platform.Link{
+		ShortCode: "bounded", LongURL: "https://example.com/", OwnerID: "owner",
+		IsCustom: true, CreatedAt: now, ExpiresAt: now.Add(24 * time.Hour),
+	}, nil); err != nil {
+		t.Fatal(err)
+	}
+	gets := &deadlineGetStore{LinkStore: store}
+	handler := NewRedirect(RedirectDeps{
+		Store: gets, Cache: memory.NewCache(), Publisher: &memory.EventPublisher{},
+		Clock: memory.NewClock(now), PrivacyKey: []byte(testPrivacyKey),
+	})
+
+	if rec := getRedirect(handler, "/bounded"); rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+	if !gets.hasDeadline {
+		t.Fatal("LinkStore.Get context had no deadline")
+	}
+	if budget := time.Until(gets.deadline); budget <= 0 || budget > storeTimeout {
+		t.Fatalf("deadline budget = %v, want in (0, %v]", budget, storeTimeout)
+	}
+}

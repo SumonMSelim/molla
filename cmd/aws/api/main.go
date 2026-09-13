@@ -6,12 +6,13 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/aws/aws-lambda-go/lambda"
-	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	awslambda "github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
@@ -37,8 +38,8 @@ func newHandler() (http.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
-	ddbClient := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) { o.Retryer = awssdk.NopRetryer{} })
-	lambdaClient := awslambda.NewFromConfig(cfg, func(o *awslambda.Options) { o.Retryer = awssdk.NopRetryer{} })
+	ddbClient := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) { o.Retryer = awsadapter.Retryer() })
+	lambdaClient := awslambda.NewFromConfig(cfg, func(o *awslambda.Options) { o.Retryer = awsadapter.Retryer() })
 	function := os.Getenv("MOLLA_INVALIDATE_FUNCTION")
 	if function == "" {
 		function = "molla-invalidate"
@@ -61,8 +62,25 @@ func runAPI(start func(any)) error {
 	if err != nil {
 		return err
 	}
-	start(httpadapter.New(handler).ProxyWithContext)
+	proxy := httpadapter.New(withRequestLogger(handler)).ProxyWithContext
+	start(proxy)
 	return nil
+}
+
+// withRequestLogger attaches the invocation logger, tagged with the Lambda
+// request ID, so every log line from one invocation correlates.
+func withRequestLogger(next http.Handler) http.Handler {
+	logger := logging.NewLogger()
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r.WithContext(logging.WithLogger(r.Context(), requestLogger(r.Context(), logger))))
+	})
+}
+
+func requestLogger(ctx context.Context, logger *slog.Logger) *slog.Logger {
+	if lc, ok := lambdacontext.FromContext(ctx); ok {
+		return logger.With("request_id", lc.AwsRequestID)
+	}
+	return logger
 }
 
 func main() {

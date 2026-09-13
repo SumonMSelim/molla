@@ -14,6 +14,7 @@ import (
 
 	awsadapter "github.com/SumonMSelim/molla/internal/adapters/aws"
 	"github.com/SumonMSelim/molla/internal/adapters/aws/ddbfake"
+	"github.com/SumonMSelim/molla/internal/adapters/logging"
 	"github.com/SumonMSelim/molla/internal/platform"
 )
 
@@ -29,12 +30,15 @@ func TestRunTakedown(t *testing.T) {
 			}
 			return nil
 		},
+		identity: func(context.Context) (platform.Principal, error) {
+			return platform.Principal{ActorID: "arn:ops", Role: platform.RoleOperator}, nil
+		},
 		lookupEnv: func(string) (string, bool) { return "", false },
 		stdout:    io.Discard,
 	}
 	var out bytes.Buffer
 	rt.stdout = &out
-	if err := run([]string{"takedown", "--code", "abc1234", "--reason", "malware", "--actor", "arn:ops"}, rt); err != nil {
+	if err := run([]string{"takedown", "--code", "abc1234", "--reason", "malware"}, rt); err != nil {
 		t.Fatal(err)
 	}
 	if got.actor != "arn:ops" || got.code != "abc1234" || got.reason != "malware" {
@@ -42,6 +46,15 @@ func TestRunTakedown(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "abc1234") {
 		t.Fatalf("stdout = %q", out.String())
+	}
+
+	// --actor is not a flag: parsing must fail rather than forge the audit actor.
+	got.actor = ""
+	if err := run([]string{"takedown", "--code", "abc1234", "--reason", "malware", "--actor", "arn:forged"}, rt); err == nil {
+		t.Fatal("--actor must not be accepted")
+	}
+	if got.actor != "" {
+		t.Fatalf("takedown ran with forged actor %q", got.actor)
 	}
 }
 
@@ -75,6 +88,12 @@ func TestRunTakedownIdentityAndErrors(t *testing.T) {
 	rt.identity = nil
 	if err := run([]string{"takedown", "--code", "abc1234", "--reason", "x"}, rt); err == nil {
 		t.Fatal("expected missing actor")
+	}
+	rt.identity = func(context.Context) (platform.Principal, error) {
+		return platform.Principal{}, nil
+	}
+	if err := run([]string{"takedown", "--code", "abc1234", "--reason", "x"}, rt); err == nil {
+		t.Fatal("expected empty STS actor rejected")
 	}
 	if err := run([]string{"takedown", "--bogus"}, rt); err == nil {
 		t.Fatal("expected flag parse error")
@@ -164,11 +183,14 @@ func TestRunIssue(t *testing.T) {
 			stored.token, stored.cred = token, cred
 			return nil
 		},
+		identity: func(context.Context) (platform.Principal, error) {
+			return platform.Principal{ActorID: "arn:ops", Role: platform.RoleOperator}, nil
+		},
 		now:       func() time.Time { return now },
 		randToken: func() (string, error) { return "generated-token", nil },
 		stdout:    &out,
 	}
-	if err := run([]string{"issue", "--owner", "acme", "--actor", "arn:ops"}, rt); err != nil {
+	if err := run([]string{"issue", "--owner", "acme"}, rt); err != nil {
 		t.Fatal(err)
 	}
 	if stored.token != "generated-token" || stored.cred.OwnerID != "acme" || stored.cred.ActorID != "arn:ops" {
@@ -180,11 +202,20 @@ func TestRunIssue(t *testing.T) {
 	if !strings.Contains(out.String(), "generated-token") {
 		t.Fatalf("stdout = %q", out.String())
 	}
-	if err := run([]string{"issue", "--owner", "acme", "--actor", "arn:ops", "--token", "existing-key"}, rt); err != nil {
+	if err := run([]string{"issue", "--owner", "acme", "--token", "existing-key"}, rt); err != nil {
 		t.Fatal(err)
 	}
 	if stored.token != "existing-key" {
 		t.Fatalf("token = %q", stored.token)
+	}
+
+	// --actor is not a flag: parsing must fail rather than forge the audit actor.
+	stored.cred = platform.Credential{}
+	if err := run([]string{"issue", "--owner", "acme", "--actor", "arn:forged"}, rt); err == nil {
+		t.Fatal("--actor must not be accepted")
+	}
+	if stored.cred.ActorID != "" {
+		t.Fatalf("issue ran with forged actor %q", stored.cred.ActorID)
 	}
 }
 
@@ -197,10 +228,10 @@ func TestRunIssueErrors(t *testing.T) {
 	if err := run([]string{"issue"}, rt); err == nil {
 		t.Fatal("expected owner")
 	}
-	if err := run([]string{"issue", "--owner", "acme", "--days", "0", "--actor", "a"}, rt); err == nil {
+	if err := run([]string{"issue", "--owner", "acme", "--days", "0"}, rt); err == nil {
 		t.Fatal("expected days")
 	}
-	if err := run([]string{"issue", "--owner", "acme", "--days", "91", "--actor", "a"}, rt); err == nil {
+	if err := run([]string{"issue", "--owner", "acme", "--days", "91"}, rt); err == nil {
 		t.Fatal("expected days")
 	}
 	if err := run([]string{"issue", "--owner", "acme"}, rt); err == nil {
@@ -212,9 +243,11 @@ func TestRunIssueErrors(t *testing.T) {
 	if err := run([]string{"issue", "--owner", "acme"}, rt); err == nil {
 		t.Fatal("expected sts")
 	}
-	rt.identity = nil
+	rt.identity = func(context.Context) (platform.Principal, error) {
+		return platform.Principal{ActorID: "arn:ops", Role: platform.RoleOperator}, nil
+	}
 	rt.randToken = nil
-	if err := run([]string{"issue", "--owner", "acme", "--actor", "a"}, rt); err == nil {
+	if err := run([]string{"issue", "--owner", "acme"}, rt); err == nil {
 		t.Fatal("expected generator")
 	}
 	if err := run([]string{"issue", "--bogus"}, rt); err == nil {
@@ -229,14 +262,14 @@ func TestAWSRuntimeIssue(t *testing.T) {
 			fake.ServeHTTP(w, r)
 			return
 		}
-		http.NotFound(w, r)
+		serveCallerIdentity(w, r)
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	cfg := awsadapter.StaticConfig("us-east-1", srv.URL, srv.Client())
 	var out bytes.Buffer
 	rt := newAWSRuntime(cfg, "molla-invalidate", io.Discard, &out)
-	if err := run([]string{"issue", "--owner", "acme", "--actor", "arn:ops", "--token", "raw-secret-token", "--days", "1"}, rt); err != nil {
+	if err := run([]string{"issue", "--owner", "acme", "--token", "raw-secret-token", "--days", "1"}, rt); err != nil {
 		t.Fatal(err)
 	}
 	hash := platform.HashToken("raw-secret-token")
@@ -258,4 +291,127 @@ func TestRandomToken(t *testing.T) {
 	if err != nil || a == b {
 		t.Fatalf("tokens not unique")
 	}
+}
+
+func TestRunRevoke(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0).UTC()
+	var revoked string
+	var audit bytes.Buffer
+	var out bytes.Buffer
+	rt := adminRuntime{
+		revoke: func(_ context.Context, hash string) error {
+			revoked = hash
+			return nil
+		},
+		audit: logging.Sink{W: &audit},
+		identity: func(context.Context) (platform.Principal, error) {
+			return platform.Principal{ActorID: "arn:sts", Role: platform.RoleOperator}, nil
+		},
+		now:    func() time.Time { return now },
+		stdout: &out,
+	}
+	hash := platform.HashToken("raw-secret-token")
+	if err := run([]string{"revoke", "--token-hash", hash}, rt); err != nil {
+		t.Fatal(err)
+	}
+	if revoked != hash {
+		t.Fatalf("revoked = %q, want %q", revoked, hash)
+	}
+	if !strings.Contains(out.String(), hash) {
+		t.Fatalf("stdout = %q", out.String())
+	}
+	var event platform.AuditEvent
+	if err := json.Unmarshal(audit.Bytes(), &event); err != nil {
+		t.Fatalf("audit %q: %v", audit.String(), err)
+	}
+	if event.ActorID != "arn:sts" || event.Role != platform.RoleOperator {
+		t.Fatalf("audit actor = %+v", event)
+	}
+	if event.ShortCode != hash || event.Outcome != auditCredentialRevoked || !event.Timestamp.Equal(now) {
+		t.Fatalf("audit event = %+v", event)
+	}
+
+	// --actor is not a flag: parsing must fail rather than forge the audit actor.
+	revoked = ""
+	if err := run([]string{"revoke", "--token-hash", hash, "--actor", "arn:forged"}, rt); err == nil {
+		t.Fatal("--actor must not be accepted")
+	}
+	if revoked != "" {
+		t.Fatalf("revoke ran with forged actor, hash %q", revoked)
+	}
+}
+
+func TestRunRevokeErrors(t *testing.T) {
+	rt := adminRuntime{stdout: io.Discard}
+	if err := run([]string{"revoke", "--token-hash", "abc"}, rt); err == nil {
+		t.Fatal("expected revoke not configured")
+	}
+	rt.revoke = func(context.Context, string) error { return platform.ErrNotFound }
+	rt.identity = func(context.Context) (platform.Principal, error) {
+		return platform.Principal{ActorID: "arn:sts", Role: platform.RoleOperator}, nil
+	}
+	if err := run([]string{"revoke"}, rt); err == nil {
+		t.Fatal("expected missing --token-hash")
+	}
+	if err := run([]string{"revoke", "--bogus"}, rt); err == nil {
+		t.Fatal("expected flag parse")
+	}
+	if err := run([]string{"revoke", "--token-hash", "missing"}, rt); !errors.Is(err, platform.ErrNotFound) {
+		t.Fatalf("error = %v", err)
+	}
+	rt.revoke = func(context.Context, string) error { return nil }
+	rt.identity = nil
+	if err := run([]string{"revoke", "--token-hash", "abc"}, rt); err == nil {
+		t.Fatal("expected STS identity required")
+	}
+}
+
+func TestAWSRuntimeRevoke(t *testing.T) {
+	fake := ddbfake.New()
+	hash := platform.HashToken("raw-secret-token")
+	fake.Seed("Credentials", hash, ddbfake.AV{
+		"token_hash": {"S": hash},
+		"actor_id":   {"S": "arn:aws:iam::1:user/ops"},
+		"owner_id":   {"S": "acme"},
+		"status":     {"S": "active"},
+		"expires_at": {"N": "1700003600"},
+	})
+	var audit bytes.Buffer
+	mux := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.Header.Get("X-Amz-Target"), "DynamoDB") {
+			fake.ServeHTTP(w, r)
+			return
+		}
+		serveCallerIdentity(w, r)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	cfg := awsadapter.StaticConfig("us-east-1", srv.URL, srv.Client())
+	var out bytes.Buffer
+	rt := newAWSRuntime(cfg, "molla-invalidate", &audit, &out)
+	if err := run([]string{"revoke", "--token-hash", hash}, rt); err != nil {
+		t.Fatal(err)
+	}
+	item, ok := fake.Item("Credentials", hash)
+	if !ok {
+		t.Fatal("credential missing")
+	}
+	if got, _ := item["status"]["S"].(string); got != string(platform.CredentialRevoked) {
+		t.Fatalf("status = %+v", item)
+	}
+	if !strings.Contains(audit.String(), "arn:aws:iam::1:user/ops") || !strings.Contains(audit.String(), auditCredentialRevoked) {
+		t.Fatalf("audit = %s", audit.String())
+	}
+}
+
+// serveCallerIdentity answers sts:GetCallerIdentity for runtime tests.
+func serveCallerIdentity(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(r.Body)
+	_ = r.ParseForm()
+	if strings.Contains(string(body), "GetCallerIdentity") || strings.Contains(r.Form.Encode(), "GetCallerIdentity") {
+		w.Header().Set("Content-Type", "text/xml")
+		_, _ = w.Write([]byte(`<GetCallerIdentityResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/"><GetCallerIdentityResult><Arn>arn:aws:iam::1:user/ops</Arn><Account>1</Account><UserId>AIDAI</UserId></GetCallerIdentityResult></GetCallerIdentityResponse>`))
+		return
+	}
+	http.NotFound(w, r)
 }

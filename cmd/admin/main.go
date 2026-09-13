@@ -29,13 +29,19 @@ import (
 	"github.com/SumonMSelim/molla/internal/platform"
 )
 
+const auditCredentialRevoked = "credential_revoked"
+
 type liveClock struct{}
 
 func (liveClock) Now() time.Time { return time.Now().UTC() }
 
 type adminRuntime struct {
-	delete    func(context.Context, platform.Principal, string, string) error
-	issue     func(context.Context, string, platform.Credential) error
+	delete func(context.Context, platform.Principal, string, string) error
+	issue  func(context.Context, string, platform.Credential) error
+	revoke func(context.Context, string) error
+	audit  platform.AuditSink
+	// identity resolves the acting principal. It is always STS-backed in real
+	// invocations; tests substitute it directly because no flag can reach it.
 	identity  func(context.Context) (platform.Principal, error)
 	now       func() time.Time
 	randToken func() (string, error)
@@ -45,13 +51,15 @@ type adminRuntime struct {
 
 func run(args []string, rt adminRuntime) error {
 	if len(args) < 1 {
-		return errors.New("usage: admin takedown|issue ...")
+		return errors.New("usage: admin takedown|issue|revoke ...")
 	}
 	switch args[0] {
 	case "takedown":
 		return runTakedown(args[1:], rt)
 	case "issue":
 		return runIssue(args[1:], rt)
+	case "revoke":
+		return runRevoke(args[1:], rt)
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
@@ -62,29 +70,20 @@ func runTakedown(args []string, rt adminRuntime) error {
 	fs.SetOutput(io.Discard)
 	code := fs.String("code", "", "")
 	reason := fs.String("reason", "", "")
-	actor := fs.String("actor", "", "")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if strings.TrimSpace(*code) == "" || strings.TrimSpace(*reason) == "" {
 		return errors.New("takedown requires --code and --reason")
 	}
-	principal := platform.Principal{Role: platform.RoleOperator, ActorID: strings.TrimSpace(*actor)}
-	if principal.ActorID == "" && rt.identity != nil {
-		got, err := rt.identity(context.Background())
-		if err != nil {
-			return err
-		}
-		principal = got
-		principal.Role = platform.RoleOperator
-	}
-	if principal.ActorID == "" {
-		return errors.New("actor required via --actor or STS caller identity")
+	principal, err := callerIdentity(rt)
+	if err != nil {
+		return err
 	}
 	if err := rt.delete(context.Background(), principal, strings.TrimSpace(*code), strings.TrimSpace(*reason)); err != nil {
 		return err
 	}
-	_, err := fmt.Fprintf(rt.stdout, "takedown %s ok\n", strings.TrimSpace(*code))
+	_, err = fmt.Fprintf(rt.stdout, "takedown %s ok\n", strings.TrimSpace(*code))
 	return err
 }
 
@@ -95,7 +94,6 @@ func runIssue(args []string, rt adminRuntime) error {
 	fs := flag.NewFlagSet("issue", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	owner := fs.String("owner", "", "")
-	actor := fs.String("actor", "", "")
 	token := fs.String("token", "", "")
 	days := fs.Int("days", 90, "")
 	if err := fs.Parse(args); err != nil {
@@ -107,16 +105,9 @@ func runIssue(args []string, rt adminRuntime) error {
 	if *days < 1 || time.Duration(*days)*24*time.Hour > platform.MaximumCredentialLifetime {
 		return errors.New("issue --days must be 1..90")
 	}
-	actorID := strings.TrimSpace(*actor)
-	if actorID == "" && rt.identity != nil {
-		got, err := rt.identity(context.Background())
-		if err != nil {
-			return err
-		}
-		actorID = got.ActorID
-	}
-	if actorID == "" {
-		return errors.New("actor required via --actor or STS caller identity")
+	principal, err := callerIdentity(rt)
+	if err != nil {
+		return err
 	}
 	raw := strings.TrimSpace(*token)
 	if raw == "" {
@@ -134,7 +125,7 @@ func runIssue(args []string, rt adminRuntime) error {
 		now = rt.now()
 	}
 	cred := platform.Credential{
-		ActorID:   actorID,
+		ActorID:   principal.ActorID,
 		OwnerID:   strings.TrimSpace(*owner),
 		Status:    platform.CredentialActive,
 		IssuedAt:  now,
@@ -143,7 +134,63 @@ func runIssue(args []string, rt adminRuntime) error {
 	if err := rt.issue(context.Background(), raw, cred); err != nil {
 		return err
 	}
-	_, err := fmt.Fprintf(rt.stdout, "issued owner=%s actor=%s\n%s\n", cred.OwnerID, cred.ActorID, raw)
+	_, err = fmt.Fprintf(rt.stdout, "issued owner=%s actor=%s\n%s\n", cred.OwnerID, cred.ActorID, raw)
+	return err
+}
+
+// callerIdentity resolves the operator principal from STS. There is no flag to
+// override it, so the audit actor is always the real caller.
+func callerIdentity(rt adminRuntime) (platform.Principal, error) {
+	if rt.identity == nil {
+		return platform.Principal{}, errors.New("STS caller identity required")
+	}
+	principal, err := rt.identity(context.Background())
+	if err != nil {
+		return platform.Principal{}, err
+	}
+	if principal.ActorID == "" {
+		return platform.Principal{}, errors.New("STS caller identity required")
+	}
+	principal.Role = platform.RoleOperator
+	return principal, nil
+}
+
+func runRevoke(args []string, rt adminRuntime) error {
+	if rt.revoke == nil {
+		return errors.New("revoke not configured")
+	}
+	fs := flag.NewFlagSet("revoke", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	hash := fs.String("token-hash", "", "")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if strings.TrimSpace(*hash) == "" {
+		return errors.New("revoke requires --token-hash")
+	}
+	principal, err := callerIdentity(rt)
+	if err != nil {
+		return err
+	}
+	tokenHash := strings.TrimSpace(*hash)
+	ctx := context.Background()
+	if err := rt.revoke(ctx, tokenHash); err != nil {
+		return err
+	}
+	if rt.audit != nil {
+		now := time.Now().UTC()
+		if rt.now != nil {
+			now = rt.now()
+		}
+		_ = rt.audit.Record(ctx, platform.AuditEvent{
+			ActorID:   principal.ActorID,
+			Role:      principal.Role,
+			ShortCode: tokenHash,
+			Outcome:   auditCredentialRevoked,
+			Timestamp: now,
+		})
+	}
+	_, err = fmt.Fprintf(rt.stdout, "revoked %s ok\n", tokenHash)
 	return err
 }
 
@@ -166,9 +213,9 @@ func stsIdentity(client *sts.Client) func(context.Context) (platform.Principal, 
 }
 
 func newAWSRuntime(cfg awssdk.Config, function string, audit, stdout io.Writer) adminRuntime {
-	ddbClient := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) { o.Retryer = awssdk.NopRetryer{} })
-	lambdaClient := awslambda.NewFromConfig(cfg, func(o *awslambda.Options) { o.Retryer = awssdk.NopRetryer{} })
-	stsClient := sts.NewFromConfig(cfg, func(o *sts.Options) { o.Retryer = awssdk.NopRetryer{} })
+	ddbClient := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) { o.Retryer = awsadapter.Retryer() })
+	lambdaClient := awslambda.NewFromConfig(cfg, func(o *awslambda.Options) { o.Retryer = awsadapter.Retryer() })
+	stsClient := sts.NewFromConfig(cfg, func(o *sts.Options) { o.Retryer = awsadapter.Retryer() })
 	idents := ddb.NewIdentityStore(ddbClient)
 	deleter := handlers.Deleter{
 		Store:       ddb.NewLinkStore(ddbClient),
@@ -179,6 +226,8 @@ func newAWSRuntime(cfg awssdk.Config, function string, audit, stdout io.Writer) 
 	return adminRuntime{
 		delete:    deleter.Delete,
 		issue:     idents.Store,
+		revoke:    idents.Revoke,
+		audit:     logging.Sink{W: audit},
 		identity:  stsIdentity(stsClient),
 		now:       func() time.Time { return time.Now().UTC() },
 		randToken: randomToken,
