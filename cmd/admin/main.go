@@ -1,9 +1,12 @@
-// Command admin is the operator CLI for abuse takedown. Identity comes from
-// STS; adapters talk to DynamoDB, the invalidation Lambda, and structured logs.
+// Command admin is the operator CLI for abuse takedown and credential issue.
+// Identity comes from STS; adapters talk to DynamoDB, the invalidation Lambda,
+// and structured logs.
 package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -32,18 +35,23 @@ func (liveClock) Now() time.Time { return time.Now().UTC() }
 
 type adminRuntime struct {
 	delete    func(context.Context, platform.Principal, string, string) error
+	issue     func(context.Context, string, platform.Credential) error
 	identity  func(context.Context) (platform.Principal, error)
+	now       func() time.Time
+	randToken func() (string, error)
 	lookupEnv func(string) (string, bool)
 	stdout    io.Writer
 }
 
 func run(args []string, rt adminRuntime) error {
 	if len(args) < 1 {
-		return errors.New("usage: admin takedown --code CODE --reason REASON [--actor ACTOR]")
+		return errors.New("usage: admin takedown|issue ...")
 	}
 	switch args[0] {
 	case "takedown":
 		return runTakedown(args[1:], rt)
+	case "issue":
+		return runIssue(args[1:], rt)
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
@@ -80,6 +88,73 @@ func runTakedown(args []string, rt adminRuntime) error {
 	return err
 }
 
+func runIssue(args []string, rt adminRuntime) error {
+	if rt.issue == nil {
+		return errors.New("issue not configured")
+	}
+	fs := flag.NewFlagSet("issue", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	owner := fs.String("owner", "", "")
+	actor := fs.String("actor", "", "")
+	token := fs.String("token", "", "")
+	days := fs.Int("days", 90, "")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if strings.TrimSpace(*owner) == "" {
+		return errors.New("issue requires --owner")
+	}
+	if *days < 1 || time.Duration(*days)*24*time.Hour > platform.MaximumCredentialLifetime {
+		return errors.New("issue --days must be 1..90")
+	}
+	actorID := strings.TrimSpace(*actor)
+	if actorID == "" && rt.identity != nil {
+		got, err := rt.identity(context.Background())
+		if err != nil {
+			return err
+		}
+		actorID = got.ActorID
+	}
+	if actorID == "" {
+		return errors.New("actor required via --actor or STS caller identity")
+	}
+	raw := strings.TrimSpace(*token)
+	if raw == "" {
+		if rt.randToken == nil {
+			return errors.New("token generator required")
+		}
+		generated, err := rt.randToken()
+		if err != nil {
+			return err
+		}
+		raw = generated
+	}
+	now := time.Now().UTC()
+	if rt.now != nil {
+		now = rt.now()
+	}
+	cred := platform.Credential{
+		ActorID:   actorID,
+		OwnerID:   strings.TrimSpace(*owner),
+		Status:    platform.CredentialActive,
+		IssuedAt:  now,
+		ExpiresAt: now.Add(time.Duration(*days) * 24 * time.Hour),
+	}
+	if err := rt.issue(context.Background(), raw, cred); err != nil {
+		return err
+	}
+	_, err := fmt.Fprintf(rt.stdout, "issued owner=%s actor=%s\n%s\n", cred.OwnerID, cred.ActorID, raw)
+	return err
+}
+
+func randomToken() (string, error) {
+	var b [32]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b[:]), nil
+}
+
 func stsIdentity(client *sts.Client) func(context.Context) (platform.Principal, error) {
 	return func(ctx context.Context) (platform.Principal, error) {
 		out, err := client.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
@@ -94,6 +169,7 @@ func newAWSRuntime(cfg awssdk.Config, function string, audit, stdout io.Writer) 
 	ddbClient := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) { o.Retryer = awssdk.NopRetryer{} })
 	lambdaClient := awslambda.NewFromConfig(cfg, func(o *awslambda.Options) { o.Retryer = awssdk.NopRetryer{} })
 	stsClient := sts.NewFromConfig(cfg, func(o *sts.Options) { o.Retryer = awssdk.NopRetryer{} })
+	idents := ddb.NewIdentityStore(ddbClient)
 	deleter := handlers.Deleter{
 		Store:       ddb.NewLinkStore(ddbClient),
 		Invalidator: lam.NewInvalidator(lambdaClient, function),
@@ -102,24 +178,19 @@ func newAWSRuntime(cfg awssdk.Config, function string, audit, stdout io.Writer) 
 	}
 	return adminRuntime{
 		delete:    deleter.Delete,
+		issue:     idents.Store,
 		identity:  stsIdentity(stsClient),
+		now:       func() time.Time { return time.Now().UTC() },
+		randToken: randomToken,
 		lookupEnv: os.LookupEnv,
 		stdout:    stdout,
 	}
 }
 
 func newRuntime() (adminRuntime, error) {
-	ctx := context.Background()
-	endpoint := os.Getenv("MOLLA_AWS_ENDPOINT")
-	var cfg awssdk.Config
-	if endpoint != "" {
-		cfg = awsadapter.StaticConfig(os.Getenv("AWS_REGION"), endpoint, nil)
-	} else {
-		loaded, err := awsadapter.Load(ctx)
-		if err != nil {
-			return adminRuntime{}, err
-		}
-		cfg = loaded
+	cfg, err := awsadapter.RuntimeConfig(context.Background())
+	if err != nil {
+		return adminRuntime{}, err
 	}
 	function := os.Getenv("MOLLA_INVALIDATE_FUNCTION")
 	if function == "" {

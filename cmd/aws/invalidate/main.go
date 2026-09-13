@@ -21,7 +21,7 @@ func handleWith(ctx context.Context, req awslambda.InvalidateRequest, redisAddr 
 	if redisAddr == "" {
 		return errors.New("MOLLA_REDIS_ADDR required")
 	}
-	client := goredis.NewClient(&goredis.Options{Addr: redisAddr})
+	client := goredis.NewClient(redisadapter.OptionsFromEnv(redisAddr))
 	defer client.Close()
 	return awslambda.Apply(ctx, redisadapter.NewCache(client), req)
 }

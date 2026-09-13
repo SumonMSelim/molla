@@ -18,7 +18,7 @@ type StatsStore struct {
 }
 
 func NewStatsStore(client clientAPI) *StatsStore {
-	return &StatsStore{client: client, table: tableStats}
+	return &StatsStore{client: client, table: statsTable()}
 }
 
 func (s *StatsStore) Get(ctx context.Context, code string) (platform.Stats, error) {

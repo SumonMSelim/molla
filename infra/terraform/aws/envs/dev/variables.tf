@@ -26,3 +26,15 @@ variable "artifact_dir" {
   type    = string
   default = "../../placeholders"
 }
+
+variable "domain_name" {
+  type        = string
+  description = "Public hostname. Empty uses the CloudFront domain only."
+  default     = ""
+}
+
+variable "hosted_zone_id" {
+  type        = string
+  description = "Route53 zone for ACM validation and alias. Required when domain_name is set."
+  default     = ""
+}

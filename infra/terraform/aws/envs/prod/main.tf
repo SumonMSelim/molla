@@ -97,6 +97,8 @@ module "edge" {
   redirect_function_url = module.api.redirect_function_url
   redirect_function_arn = module.api.redirect_function_arn
   enable_waf            = true
+  domain_name           = var.domain_name
+  hosted_zone_id        = var.hosted_zone_id
   alarm_actions         = [aws_sns_topic.alarms.arn]
   tags                  = local.tags
 }

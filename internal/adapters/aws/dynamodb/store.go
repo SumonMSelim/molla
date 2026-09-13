@@ -20,7 +20,7 @@ type LinkStore struct {
 }
 
 func NewLinkStore(client clientAPI) *LinkStore {
-	return &LinkStore{client: client, links: tableLinks, idempotency: tableIdempotency}
+	return &LinkStore{client: client, links: linksTable(), idempotency: idempotencyTable()}
 }
 
 func (s *LinkStore) Get(ctx context.Context, code string) (platform.Link, error) {

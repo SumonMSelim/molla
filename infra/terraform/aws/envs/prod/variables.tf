@@ -61,3 +61,15 @@ variable "central_access_analyzer_arn" {
   type    = string
   default = ""
 }
+
+variable "domain_name" {
+  type        = string
+  description = "Public hostname (mol.la). Empty uses the CloudFront domain only."
+  default     = ""
+}
+
+variable "hosted_zone_id" {
+  type        = string
+  description = "Route53 zone for ACM validation and alias. Required when domain_name is set."
+  default     = ""
+}

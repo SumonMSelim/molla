@@ -32,3 +32,18 @@ func TestStaticConfigDefaults(t *testing.T) {
 		t.Fatal("nil HTTP client")
 	}
 }
+
+func TestRuntimeConfigUsesEndpoint(t *testing.T) {
+	t.Setenv("MOLLA_AWS_ENDPOINT", "http://127.0.0.1:1")
+	t.Setenv("AWS_REGION", "eu-central-1")
+	cfg, err := RuntimeConfig(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Region != "eu-central-1" {
+		t.Fatalf("region = %q", cfg.Region)
+	}
+	if cfg.BaseEndpoint == nil || *cfg.BaseEndpoint != "http://127.0.0.1:1" {
+		t.Fatalf("endpoint = %v", cfg.BaseEndpoint)
+	}
+}

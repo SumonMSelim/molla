@@ -165,6 +165,12 @@ resource "aws_iam_role_policy" "admin" {
         Resource = var.table_arns["links"]
       },
       {
+        Sid      = "IssueCredentials"
+        Effect   = "Allow"
+        Action   = ["dynamodb:PutItem", "dynamodb:GetItem"]
+        Resource = var.table_arns["credentials"]
+      },
+      {
         Sid      = "InvokeInvalidation"
         Effect   = "Allow"
         Action   = ["lambda:InvokeFunction"]
@@ -175,6 +181,12 @@ resource "aws_iam_role_policy" "admin" {
         Effect   = "Allow"
         Action   = ["sts:GetCallerIdentity"]
         Resource = "*"
+      },
+      {
+        Sid      = "TableKMS"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
+        Resource = var.kms_key_arn
       }
     ]
   })

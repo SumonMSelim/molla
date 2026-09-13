@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"log"
-	"os"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -55,16 +54,9 @@ func handleEvent(ctx context.Context, event events.KinesisEvent, store platform.
 }
 
 func newStatsStore() (platform.StatsStore, error) {
-	endpoint := os.Getenv("MOLLA_AWS_ENDPOINT")
-	var cfg awssdk.Config
-	if endpoint != "" {
-		cfg = awsadapter.StaticConfig(os.Getenv("AWS_REGION"), endpoint, nil)
-	} else {
-		loaded, err := awsadapter.Load(context.Background())
-		if err != nil {
-			return nil, err
-		}
-		cfg = loaded
+	cfg, err := awsadapter.RuntimeConfig(context.Background())
+	if err != nil {
+		return nil, err
 	}
 	client := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) { o.Retryer = awssdk.NopRetryer{} })
 	return ddb.NewStatsStore(client), nil

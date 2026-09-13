@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	awsadapter "github.com/SumonMSelim/molla/internal/adapters/aws"
 	"github.com/SumonMSelim/molla/internal/adapters/aws/ddbfake"
@@ -148,5 +149,113 @@ func TestAWSRuntimeTakedown(t *testing.T) {
 	}
 	if !strings.Contains(audit.String(), "owner") || !strings.Contains(audit.String(), "arn:aws:iam::1:user/ops") {
 		t.Fatalf("audit = %s", audit.String())
+	}
+}
+
+func TestRunIssue(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0).UTC()
+	var stored struct {
+		token string
+		cred  platform.Credential
+	}
+	var out bytes.Buffer
+	rt := adminRuntime{
+		issue: func(_ context.Context, token string, cred platform.Credential) error {
+			stored.token, stored.cred = token, cred
+			return nil
+		},
+		now:       func() time.Time { return now },
+		randToken: func() (string, error) { return "generated-token", nil },
+		stdout:    &out,
+	}
+	if err := run([]string{"issue", "--owner", "acme", "--actor", "arn:ops"}, rt); err != nil {
+		t.Fatal(err)
+	}
+	if stored.token != "generated-token" || stored.cred.OwnerID != "acme" || stored.cred.ActorID != "arn:ops" {
+		t.Fatalf("stored = %+v", stored)
+	}
+	if stored.cred.ExpiresAt != now.Add(90*24*time.Hour) {
+		t.Fatalf("expires = %s", stored.cred.ExpiresAt)
+	}
+	if !strings.Contains(out.String(), "generated-token") {
+		t.Fatalf("stdout = %q", out.String())
+	}
+	if err := run([]string{"issue", "--owner", "acme", "--actor", "arn:ops", "--token", "existing-key"}, rt); err != nil {
+		t.Fatal(err)
+	}
+	if stored.token != "existing-key" {
+		t.Fatalf("token = %q", stored.token)
+	}
+}
+
+func TestRunIssueErrors(t *testing.T) {
+	rt := adminRuntime{stdout: io.Discard}
+	if err := run([]string{"issue", "--owner", "acme"}, rt); err == nil {
+		t.Fatal("expected issue not configured")
+	}
+	rt.issue = func(context.Context, string, platform.Credential) error { return nil }
+	if err := run([]string{"issue"}, rt); err == nil {
+		t.Fatal("expected owner")
+	}
+	if err := run([]string{"issue", "--owner", "acme", "--days", "0", "--actor", "a"}, rt); err == nil {
+		t.Fatal("expected days")
+	}
+	if err := run([]string{"issue", "--owner", "acme", "--days", "91", "--actor", "a"}, rt); err == nil {
+		t.Fatal("expected days")
+	}
+	if err := run([]string{"issue", "--owner", "acme"}, rt); err == nil {
+		t.Fatal("expected actor")
+	}
+	rt.identity = func(context.Context) (platform.Principal, error) {
+		return platform.Principal{}, errors.New("sts down")
+	}
+	if err := run([]string{"issue", "--owner", "acme"}, rt); err == nil {
+		t.Fatal("expected sts")
+	}
+	rt.identity = nil
+	rt.randToken = nil
+	if err := run([]string{"issue", "--owner", "acme", "--actor", "a"}, rt); err == nil {
+		t.Fatal("expected generator")
+	}
+	if err := run([]string{"issue", "--bogus"}, rt); err == nil {
+		t.Fatal("expected flag parse")
+	}
+}
+
+func TestAWSRuntimeIssue(t *testing.T) {
+	fake := ddbfake.New()
+	mux := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.Header.Get("X-Amz-Target"), "DynamoDB") {
+			fake.ServeHTTP(w, r)
+			return
+		}
+		http.NotFound(w, r)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	cfg := awsadapter.StaticConfig("us-east-1", srv.URL, srv.Client())
+	var out bytes.Buffer
+	rt := newAWSRuntime(cfg, "molla-invalidate", io.Discard, &out)
+	if err := run([]string{"issue", "--owner", "acme", "--actor", "arn:ops", "--token", "raw-secret-token", "--days", "1"}, rt); err != nil {
+		t.Fatal(err)
+	}
+	hash := platform.HashToken("raw-secret-token")
+	item, ok := fake.Item("Credentials", hash)
+	if !ok {
+		t.Fatal("credential not stored")
+	}
+	if got, _ := item["owner_id"]["S"].(string); got != "acme" {
+		t.Fatalf("item = %+v", item)
+	}
+}
+
+func TestRandomToken(t *testing.T) {
+	a, err := randomToken()
+	if err != nil || len(a) != 64 {
+		t.Fatalf("token %q %v", a, err)
+	}
+	b, err := randomToken()
+	if err != nil || a == b {
+		t.Fatalf("tokens not unique")
 	}
 }
