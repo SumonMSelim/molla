@@ -18,9 +18,9 @@ export function Chrome({
   const max = width === 'prose' ? 'max-w-2xl' : 'max-w-3xl'
   return (
     <div className="relative flex min-h-svh flex-col bg-background bg-dot-grid">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(ellipse_at_top,var(--glow),transparent_65%)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-80 origin-top animate-ambient-pulse bg-[radial-gradient(ellipse_at_top,var(--glow),transparent_65%)]" />
       <div className={`relative mx-auto flex w-full flex-1 flex-col ${max} px-6 py-10 sm:py-16`}>
-        <header className="mb-10 flex items-center justify-between gap-4">
+        <header className="mb-10 flex animate-fade-up items-center justify-between gap-4">
           <a href="/app/" className="font-mono text-sm font-medium tracking-tight text-brand glow-text">
             mol.la
           </a>
