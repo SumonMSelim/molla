@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/SumonMSelim/molla/internal/adapters/logging"
 	"github.com/SumonMSelim/molla/internal/platform"
 )
 
@@ -18,6 +19,7 @@ func (a *API) authenticate(next http.Handler) http.Handler {
 		principal, err := a.credentials.Resolve(r.Context(), token, a.clock.Now())
 		if err != nil {
 			if errors.Is(err, platform.ErrDependency) {
+				logging.FromContext(r.Context()).Error("credential resolve failed", "error", err)
 				writeError(w, http.StatusServiceUnavailable, "TEMPORARILY_UNAVAILABLE")
 				return
 			}

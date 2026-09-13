@@ -10,17 +10,21 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"sync/atomic"
 	"time"
 
+	"github.com/SumonMSelim/molla/internal/adapters/logging"
 	"github.com/SumonMSelim/molla/internal/core"
 	"github.com/SumonMSelim/molla/internal/platform"
 )
 
 const (
-	cacheFreshTTL    = 24 * time.Hour
-	cacheStaleGrace  = 15 * time.Minute
-	publishTimeout   = 100 * time.Millisecond
+	cacheFreshTTL   = 24 * time.Hour
+	cacheStaleGrace = 15 * time.Minute
+	publishTimeout  = 100 * time.Millisecond
+	// storeTimeout bounds the DynamoDB read on the hot path. The redirect
+	// Lambda has a 3s budget; 1s leaves room for the SDK's three attempts to
+	// finish or be cut short, plus the cache write and the response.
+	storeTimeout     = 1 * time.Second
 	redirectCacheTTL = "public, max-age=5"
 	cacheNoStore     = "no-store"
 )
@@ -35,12 +39,11 @@ type RedirectDeps struct {
 }
 
 type Redirect struct {
-	store           platform.LinkStore
-	cache           platform.Cache
-	publisher       platform.EventPublisher
-	clock           platform.Clock
-	privacyKey      []byte
-	publishFailures atomic.Uint64
+	store      platform.LinkStore
+	cache      platform.Cache
+	publisher  platform.EventPublisher
+	clock      platform.Clock
+	privacyKey []byte
 }
 
 // NewRedirect returns the GET /{code} mux for the redirect origin.
@@ -66,9 +69,13 @@ func (h *Redirect) serve(w http.ResponseWriter, r *http.Request) {
 
 	now := h.clock.Now().UTC()
 	record, outcome, err := h.cache.Get(r.Context(), code, now)
+	log := logging.FromContext(r.Context()).With("short_code", code)
 	if err != nil {
+		log.Error("cache read failed", "error", err)
 		outcome = platform.CacheMiss
 		record = platform.CacheRecord{}
+	} else {
+		log.Debug("cache read", "outcome", outcome)
 	}
 
 	switch outcome {
@@ -88,8 +95,16 @@ func (h *Redirect) serve(w http.ResponseWriter, r *http.Request) {
 	h.lookup(w, r, code, now)
 }
 
+// storeGet reads the link with a budget tighter than the Lambda's own timeout,
+// so a hung DynamoDB call still leaves room to fall back or fail fast.
+func (h *Redirect) storeGet(r *http.Request, code string) (platform.Link, error) {
+	ctx, cancel := context.WithTimeout(r.Context(), storeTimeout)
+	defer cancel()
+	return h.store.Get(ctx, code)
+}
+
 func (h *Redirect) revalidate(w http.ResponseWriter, r *http.Request, code string, now time.Time, stale platform.CacheRecord) {
-	link, err := h.store.Get(r.Context(), code)
+	link, err := h.storeGet(r, code)
 	if err == nil {
 		h.applyStore(w, r, link, now)
 		return
@@ -99,19 +114,22 @@ func (h *Redirect) revalidate(w http.ResponseWriter, r *http.Request, code strin
 		return
 	}
 	if stale.State == platform.CacheActive && now.Before(stale.StaleUntil) && now.Before(stale.ExpiresAt) && stale.LongURL != "" {
+		logging.FromContext(r.Context()).Warn("serving stale cache record", "short_code", code, "error", err)
 		h.found(w, r, code, stale.LongURL, now)
 		return
 	}
+	logging.FromContext(r.Context()).Error("revalidate failed", "short_code", code, "error", err)
 	writeNoStore(w, http.StatusServiceUnavailable)
 }
 
 func (h *Redirect) lookup(w http.ResponseWriter, r *http.Request, code string, now time.Time) {
-	link, err := h.store.Get(r.Context(), code)
+	link, err := h.storeGet(r, code)
 	if errors.Is(err, platform.ErrNotFound) {
 		writeNoStore(w, http.StatusNotFound)
 		return
 	}
 	if err != nil {
+		logging.FromContext(r.Context()).Error("link lookup failed", "short_code", code, "error", err)
 		writeNoStore(w, http.StatusServiceUnavailable)
 		return
 	}
@@ -125,12 +143,16 @@ func (h *Redirect) applyStore(w http.ResponseWriter, r *http.Request, link platf
 		ExpiresAt: link.ExpiresAt,
 	}, now)
 	if decision.Found {
-		_ = h.cache.Put(r.Context(), activeCacheRecord(link, now))
+		if err := h.cache.Put(r.Context(), activeCacheRecord(link, now)); err != nil {
+			logging.FromContext(r.Context()).Error("cache populate failed", "short_code", link.ShortCode, "error", err)
+		}
 		h.found(w, r, link.ShortCode, decision.LongURL, now)
 		return
 	}
 	if !link.IsActive {
-		_ = h.cache.Put(r.Context(), deletedCacheRecord(link, now))
+		if err := h.cache.Put(r.Context(), deletedCacheRecord(link, now)); err != nil {
+			logging.FromContext(r.Context()).Error("tombstone populate failed", "short_code", link.ShortCode, "error", err)
+		}
 	}
 	writeNoStore(w, http.StatusNotFound)
 }
@@ -155,7 +177,7 @@ func (h *Redirect) publish(r *http.Request, code string, now time.Time) {
 		SourceIPHash: hashSourceIP(h.privacyKey, requestIP(r), now),
 	})
 	if err != nil {
-		h.publishFailures.Add(1)
+		logging.FromContext(r.Context()).Error("click publish failed", "short_code", code, "error", err)
 	}
 }
 

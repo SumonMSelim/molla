@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/SumonMSelim/molla/internal/adapters/logging"
 	"github.com/SumonMSelim/molla/internal/core"
 	"github.com/SumonMSelim/molla/internal/platform"
 )
@@ -88,6 +89,9 @@ func (a *API) create(w http.ResponseWriter, r *http.Request) {
 
 	created, err := a.persist(r.Context(), link, req.Alias, idem)
 	if err != nil {
+		if errors.Is(err, platform.ErrDependency) {
+			logging.FromContext(r.Context()).Error("link create failed", "owner_id", principal.OwnerID, "custom_alias", req.Alias != "", "error", err)
+		}
 		writeCreateError(w, err, req.Alias != "")
 		return
 	}

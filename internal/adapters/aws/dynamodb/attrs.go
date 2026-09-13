@@ -2,6 +2,7 @@ package dynamodb
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -149,9 +150,12 @@ func itemFromLink(link platform.Link) map[string]types.AttributeValue {
 	return item
 }
 
+// mapAWSError collapses SDK failures onto platform.ErrDependency while
+// keeping the underlying cause reachable through errors.Unwrap, so a 503 can
+// be attributed to a throttle, an IAM denial, or a timeout in the logs.
 func mapAWSError(err error) error {
 	if err == nil {
 		return nil
 	}
-	return platform.ErrDependency
+	return fmt.Errorf("%w: %w", platform.ErrDependency, err)
 }

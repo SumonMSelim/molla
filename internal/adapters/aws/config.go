@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 )
@@ -39,4 +40,11 @@ func StaticConfig(region, endpoint string, client aws.HTTPClient) aws.Config {
 		HTTPClient:       client,
 		RetryMaxAttempts: 1,
 	}
+}
+
+// Retryer is the retry policy every AWS client in this repo uses: bounded
+// attempts with the SDK's default exponential backoff and jitter, so a single
+// throttle or transient network blip does not surface as a request error.
+func Retryer() aws.Retryer {
+	return retry.NewStandard(func(o *retry.StandardOptions) { o.MaxAttempts = 3 })
 }
