@@ -63,6 +63,19 @@ export function CreatePage({ selected, onOpen, onClear }: CreatePageProps) {
 
   return (
     <Chrome>
+        <div className="animate-fade-up pb-10 text-center sm:pb-14">
+          <p className="font-mono text-xs font-medium tracking-[0.2em] text-brand-text uppercase glow-text">
+            open · public · no account
+          </p>
+          <h1 className="mt-4 text-display font-semibold text-balance">
+            Long links,<br />
+            <span className="text-brand glow-text">shortened.</span>
+          </h1>
+          <p className="mx-auto mt-5 max-w-md text-prose text-muted-foreground text-balance">
+            Paste a URL, get a short one back. No sign-up, no waiting — anyone can create a link and see its clicks.
+          </p>
+        </div>
+
         <form onSubmit={onSubmit} className="relative animate-fade-up pt-5 [animation-delay:80ms]">
           <div className="absolute top-0 left-6 z-10 border border-b-0 border-border bg-card px-4 py-2 text-sm font-medium">
             Short link
@@ -164,7 +177,27 @@ export function CreatePage({ selected, onOpen, onClear }: CreatePageProps) {
               }}
             />
           </div>
-        ) : null}
+        ) : (
+          <dl className="mt-16 grid gap-6 sm:grid-cols-3">
+            {FEATURES.map((feature, i) => (
+              <div
+                key={feature.title}
+                className="animate-fade-up border border-border bg-card p-5"
+                style={{ animationDelay: `${200 + i * 80}ms` }}
+              >
+                <dt className="font-mono text-xs text-brand-text">{feature.tag}</dt>
+                <dd className="mt-2 text-sm font-medium">{feature.title}</dd>
+                <dd className="mt-1 text-xs text-muted-foreground">{feature.body}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
     </Chrome>
   )
 }
+
+const FEATURES = [
+  { tag: '01', title: 'No account needed', body: 'Create and check stats on any link without signing up.' },
+  { tag: '02', title: 'Kept for 5 years', body: 'Links last up to 1,825 days by default, or set your own expiry.' },
+  { tag: '03', title: 'Public click counts', body: 'Anyone with a short code can see how many times it was clicked.' },
+] as const
