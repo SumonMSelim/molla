@@ -191,6 +191,7 @@ module "ci" {
   source            = "../../modules/ci"
   name_prefix       = local.name_prefix
   github_repository = var.github_repository
+  kms_key_arn       = aws_kms_key.this.arn
   tags              = local.tags
 }
 

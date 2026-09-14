@@ -33,6 +33,16 @@ jobs:
         with:
           terraform_version: "1.16.2"
 
+      # Public claims only (never the token itself): makes an OIDC trust
+      # mismatch diagnosable from the run log instead of a bare 403.
+      - name: Show OIDC token claims
+        run: |
+          token="$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r .value)"
+          payload="$(printf '%s' "$token" | cut -d. -f2 | tr '_-' '/+')"
+          pad=$(( (4 - ${#payload} % 4) % 4 ))
+          printf '%s%s' "$payload" "$(printf '=%.0s' $(seq 1 $pad))" | base64 -d | jq '{sub, aud, repository, environment, ref, event_name}'
+
       - uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
