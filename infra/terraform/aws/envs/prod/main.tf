@@ -28,7 +28,7 @@ locals {
   permutation_key      = var.permutation_key != "" ? var.permutation_key : one(random_password.permutation_key[*].result)
   privacy_key          = var.privacy_key != "" ? var.privacy_key : one(random_password.privacy_key[*].result)
   redis_auth_token     = var.redis_auth_token != "" ? var.redis_auth_token : one(random_password.redis_auth_token[*].result)
-  origin_verify_secret = var.origin_verify_secret != "" ? var.origin_verify_secret : coalesce(one(random_password.origin_verify_secret[*].result), "")
+  origin_verify_secret = var.origin_verify_secret != "" ? var.origin_verify_secret : try(coalesce(one(random_password.origin_verify_secret[*].result), ""), "")
   name_prefix          = "molla-prod"
   tags = {
     Workload       = "molla"
