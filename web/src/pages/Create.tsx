@@ -65,14 +65,14 @@ export function CreatePage({ selected, onOpen, onClear }: CreatePageProps) {
     <Chrome>
         <div className="animate-fade-up pb-10 text-center sm:pb-14">
           <p className="font-mono text-xs font-medium tracking-[0.2em] text-brand-text uppercase glow-text">
-            open · public · no account
+            open · public · no personal data collected
           </p>
           <h1 className="mt-4 text-display font-semibold text-balance">
             Long links,<br />
             <span className="text-brand glow-text">shortened.</span>
           </h1>
           <p className="mx-auto mt-5 max-w-md text-prose text-muted-foreground text-balance">
-            Paste a URL, get a short one back. No sign-up, no waiting — anyone can create a link and see its clicks.
+            Paste a URL, get a short one back. No sign-up, no waiting: anyone can create a link.
           </p>
         </div>
 
@@ -94,7 +94,7 @@ export function CreatePage({ selected, onOpen, onClear }: CreatePageProps) {
                 value={longUrl}
                 onChange={(e) => setLongUrl(e.target.value)}
                 className={`${fieldClass} font-mono text-code`}
-                placeholder="https://example.com/my-long-url"
+                placeholder="https://sumonselim.com/molla-url-shortener"
                 required
               />
             </div>
@@ -197,7 +197,7 @@ export function CreatePage({ selected, onOpen, onClear }: CreatePageProps) {
 }
 
 const FEATURES = [
-  { tag: '01', title: 'No account needed', body: 'Create and check stats on any link without signing up.' },
+  { tag: '01', title: 'No account needed', body: 'Create short links for any link without signing up.' },
   { tag: '02', title: 'Kept for 5 years', body: 'Links last up to 1,825 days by default, or set your own expiry.' },
-  { tag: '03', title: 'Public click counts', body: 'Anyone with a short code can see how many times it was clicked.' },
+  { tag: '03', title: 'No personal data collected', body: 'We do not collect any personal data from you.' },
 ] as const
