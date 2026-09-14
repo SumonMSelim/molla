@@ -21,9 +21,13 @@ locals {
   # present sub as repo:<repo>:environment:<name>; there is no ref-pattern
   # form for workflow_dispatch, so the environment claim is the only
   # condition that covers both triggers.
-  oidc_sub = "repo:${var.github_repository}:environment:${var.github_environment}"
+  oidc_sub_apply = "repo:${var.github_repository}:environment:${var.github_environment}"
+  # Separate, unprotected environment for the plan role: it has no required
+  # reviewer, so terraform-plan stays a fully automatic PR check instead of
+  # blocking on the same approval as a deploy.
+  oidc_sub_plan = "repo:${var.github_repository}:environment:${var.github_plan_environment}"
 
-  assume_via_oidc = jsonencode({
+  assume_via_oidc_apply = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Effect    = "Allow"
@@ -34,7 +38,24 @@ locals {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
         }
         StringLike = {
-          "token.actions.githubusercontent.com:sub" = local.oidc_sub
+          "token.actions.githubusercontent.com:sub" = local.oidc_sub_apply
+        }
+      }
+    }]
+  })
+
+  assume_via_oidc_plan = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Action    = "sts:AssumeRoleWithWebIdentity"
+      Principal = { Federated = aws_iam_openid_connect_provider.github.arn }
+      Condition = {
+        StringEquals = {
+          "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+        }
+        StringLike = {
+          "token.actions.githubusercontent.com:sub" = local.oidc_sub_plan
         }
       }
     }]
@@ -43,7 +64,7 @@ locals {
 
 resource "aws_iam_role" "plan" {
   name               = "${var.name_prefix}-gha-plan"
-  assume_role_policy = local.assume_via_oidc
+  assume_role_policy = local.assume_via_oidc_plan
   tags               = var.tags
 }
 
@@ -60,7 +81,7 @@ resource "aws_iam_role_policy_attachment" "plan_read_only" {
 
 resource "aws_iam_role" "apply" {
   name               = "${var.name_prefix}-gha-apply"
-  assume_role_policy = local.assume_via_oidc
+  assume_role_policy = local.assume_via_oidc_apply
   tags               = var.tags
 }
 
