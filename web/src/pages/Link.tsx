@@ -68,7 +68,7 @@ export function LinkPage({ code, onBack, onForgotten }: LinkPageProps) {
           </div>
           <div className="flex justify-between gap-4 border-t border-border px-3 py-2">
             <dt className="text-sm text-muted-foreground">Last click</dt>
-            <dd className="font-mono text-xs">{stats.last_click_at ?? '—'}</dd>
+            <dd className="font-mono text-xs">{stats.last_click_at ?? 'None yet'}</dd>
           </div>
         </dl>
       ) : null}
