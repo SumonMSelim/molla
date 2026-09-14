@@ -93,8 +93,11 @@ func (s *IdentityStore) Revoke(ctx context.Context, hash string) error {
 	_, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName:           aws.String(s.table),
 		Key:                 map[string]types.AttributeValue{attrTokenHash: avS(hash)},
-		UpdateExpression:    aws.String("SET " + attrStatus + " = :status"),
+		UpdateExpression:    aws.String("SET #s = :status"),
 		ConditionExpression: aws.String("attribute_exists(" + attrTokenHash + ")"),
+		ExpressionAttributeNames: map[string]string{
+			"#s": attrStatus,
+		},
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":status": avS(string(platform.CredentialRevoked)),
 		},

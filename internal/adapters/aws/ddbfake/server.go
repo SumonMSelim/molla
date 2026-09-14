@@ -179,10 +179,13 @@ func (s *Server) updateItem(w http.ResponseWriter, body []byte) {
 		Key                       AV
 		UpdateExpression          string
 		ConditionExpression       string
+		ExpressionAttributeNames  map[string]string
 		ExpressionAttributeValues AV
 		ReturnValues              string
 	}
 	_ = json.Unmarshal(body, &req)
+	updateExpr := resolveNames(req.UpdateExpression, req.ExpressionAttributeNames)
+	conditionExpr := resolveNames(req.ConditionExpression, req.ExpressionAttributeNames)
 	pk := pkValue(req.Key)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -193,11 +196,11 @@ func (s *Server) updateItem(w http.ResponseWriter, body []byte) {
 	if !ok {
 		item = clone(req.Key)
 	}
-	if req.ConditionExpression != "" && !matchCondition(item, req.ConditionExpression, req.ExpressionAttributeValues) {
+	if conditionExpr != "" && !matchCondition(item, conditionExpr, req.ExpressionAttributeValues) {
 		writeConditionalFailed(w)
 		return
 	}
-	applyUpdate(item, req.UpdateExpression, req.ExpressionAttributeValues)
+	applyUpdate(item, updateExpr, req.ExpressionAttributeValues)
 	s.tables[req.TableName][pk] = item
 	resp := map[string]any{}
 	if strings.EqualFold(req.ReturnValues, "ALL_NEW") {
@@ -231,6 +234,13 @@ func matchCondition(item AV, expr string, values AV) bool {
 		}
 	}
 	return true
+}
+
+func resolveNames(expr string, names map[string]string) string {
+	for placeholder, name := range names {
+		expr = strings.ReplaceAll(expr, placeholder, name)
+	}
+	return expr
 }
 
 func applyUpdate(item AV, expr string, values AV) {

@@ -54,7 +54,10 @@ func (a *IDAllocator) leaseBlock(ctx context.Context) (int64, error) {
 	out, err := a.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName:        aws.String(a.table),
 		Key:              map[string]types.AttributeValue{attrRegion: avS(a.region)},
-		UpdateExpression: aws.String("ADD " + attrCounter + " :n"),
+		UpdateExpression: aws.String("ADD #c :n"),
+		ExpressionAttributeNames: map[string]string{
+			"#c": attrCounter,
+		},
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":n": avN(a.blockSize),
 		},
