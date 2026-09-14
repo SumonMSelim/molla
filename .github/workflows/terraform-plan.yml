@@ -25,7 +25,7 @@ jobs:
   plan:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: production
+    environment: production-plan
     steps:
       - uses: actions/checkout@v7
 
