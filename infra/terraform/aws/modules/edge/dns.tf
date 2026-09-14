@@ -106,3 +106,34 @@ resource "cloudflare_ruleset" "api_rate_limit" {
     }
   }]
 }
+
+# www is not a CloudFront alias; Cloudflare answers it and redirects to the
+# apex before anything reaches the origin. The record must stay proxied for
+# the redirect rule to run.
+resource "cloudflare_dns_record" "www" {
+  count   = var.domain_name == "" ? 0 : 1
+  zone_id = var.cloudflare_zone_id
+  name    = "www.${var.domain_name}"
+  type    = "CNAME"
+  content = var.domain_name
+  ttl     = 1
+  proxied = true
+}
+
+# Single Redirects (the cloudflare_ruleset phase http_request_dynamic_redirect)
+# needs a token permission this zone's token does not grant; a Page Rule
+# achieves the same 301 with the Page Rules permission the token already has.
+resource "cloudflare_page_rule" "www_redirect" {
+  count    = var.domain_name == "" ? 0 : 1
+  zone_id  = var.cloudflare_zone_id
+  target   = "www.${var.domain_name}/*"
+  priority = 1
+  status   = "active"
+
+  actions = {
+    forwarding_url = {
+      url         = "https://${var.domain_name}/$1"
+      status_code = 301
+    }
+  }
+}
