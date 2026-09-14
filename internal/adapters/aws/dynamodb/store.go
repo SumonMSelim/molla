@@ -131,12 +131,21 @@ func (s *LinkStore) SoftDelete(ctx context.Context, principal platform.Principal
 		TableName: aws.String(s.links),
 		Key:       map[string]types.AttributeValue{attrShortCode: avS(code)},
 		UpdateExpression: aws.String(
-			"SET " + attrIsActive + " = :false, " + attrVersion + " = :ver, " +
-				attrDeletedAt + " = :now, " + attrPurgeAt + " = :purge, " +
-				attrDeletedBy + " = :actor, " + attrDeleteRole + " = :role, " +
-				attrDeleteReason + " = :reason",
+			"SET #active = :false, #ver = :ver, " +
+				"#deleted_at = :now, #purge_at = :purge, " +
+				"#deleted_by = :actor, #delete_role = :role, " +
+				"#delete_reason = :reason",
 		),
-		ConditionExpression: aws.String(attrIsActive + " = :true AND " + attrVersion + " = :old"),
+		ConditionExpression: aws.String("#active = :true AND #ver = :old"),
+		ExpressionAttributeNames: map[string]string{
+			"#active":        attrIsActive,
+			"#ver":           attrVersion,
+			"#deleted_at":    attrDeletedAt,
+			"#purge_at":      attrPurgeAt,
+			"#deleted_by":    attrDeletedBy,
+			"#delete_role":   attrDeleteRole,
+			"#delete_reason": attrDeleteReason,
+		},
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":false":  avB(false),
 			":true":   avB(true),
