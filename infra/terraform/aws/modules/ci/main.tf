@@ -21,11 +21,23 @@ locals {
   # present sub as repo:<repo>:environment:<name>; there is no ref-pattern
   # form for workflow_dispatch, so the environment claim is the only
   # condition that covers both triggers.
-  oidc_sub_apply = "repo:${var.github_repository}:environment:${var.github_environment}"
+  # GitHub can mint the sub with immutable IDs baked in
+  # (repo:owner@<owner_id>/name@<repo_id>:...) when the repo enables
+  # use_immutable_subject. "@" is not legal in GitHub user or repo names, so
+  # the wildcard form cannot match any other repository.
+  oidc_sub_apply = [
+    "repo:${var.github_repository}:environment:${var.github_environment}",
+    "repo:${local.github_owner}@*/${local.github_repo}@*:environment:${var.github_environment}",
+  ]
   # Separate, unprotected environment for the plan role: it has no required
   # reviewer, so terraform-plan stays a fully automatic PR check instead of
   # blocking on the same approval as a deploy.
-  oidc_sub_plan = "repo:${var.github_repository}:environment:${var.github_plan_environment}"
+  oidc_sub_plan = [
+    "repo:${var.github_repository}:environment:${var.github_plan_environment}",
+    "repo:${local.github_owner}@*/${local.github_repo}@*:environment:${var.github_plan_environment}",
+  ]
+  github_owner = split("/", var.github_repository)[0]
+  github_repo  = split("/", var.github_repository)[1]
 
   assume_via_oidc_apply = jsonencode({
     Version = "2012-10-17"
