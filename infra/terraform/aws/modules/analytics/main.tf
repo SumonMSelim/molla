@@ -73,7 +73,6 @@ resource "aws_kinesis_stream" "clicks" {
 
 resource "aws_sqs_queue" "aggregate_dlq" {
   name                      = "${var.name_prefix}-aggregate-dlq"
-  sqs_managed_sse_enabled   = false
   kms_master_key_id         = var.kms_key_arn
   message_retention_seconds = 1209600
   tags                      = var.tags
@@ -158,7 +157,7 @@ resource "aws_lambda_function" "aggregate" {
   architectures                  = ["arm64"]
   memory_size                    = 128
   timeout                        = 60
-  reserved_concurrent_executions = 20
+  reserved_concurrent_executions = var.aggregate_reserved_concurrency
   kms_key_arn                    = var.kms_key_arn
   tracing_config {
     mode = "Active"
@@ -239,11 +238,6 @@ resource "aws_kinesis_firehose_delivery_stream" "archive" {
   kinesis_source_configuration {
     kinesis_stream_arn = aws_kinesis_stream.clicks.arn
     role_arn           = aws_iam_role.firehose.arn
-  }
-  server_side_encryption {
-    enabled  = true
-    key_type = "CUSTOMER_MANAGED_CMK"
-    key_arn  = var.kms_key_arn
   }
   extended_s3_configuration {
     role_arn            = aws_iam_role.firehose.arn

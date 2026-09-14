@@ -52,16 +52,73 @@ locals {
   }
 }
 
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+
 resource "aws_kms_key" "this" {
   description             = "molla prod"
   deletion_window_in_days = 30
   enable_key_rotation     = true
   tags                    = local.tags
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "EnableRootPermissions"
+        Effect    = "Allow"
+        Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root" }
+        Action    = "kms:*"
+        Resource  = "*"
+      },
+      {
+        Sid       = "AllowCloudWatchLogs"
+        Effect    = "Allow"
+        Principal = { Service = "logs.${data.aws_region.current.region}.amazonaws.com" }
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey",
+        ]
+        Resource = "*"
+        Condition = {
+          ArnLike = {
+            "kms:EncryptionContext:aws:logs:arn" = "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:*"
+          }
+        }
+      }
+    ]
+  })
 }
 
 resource "aws_kms_alias" "this" {
   name          = "alias/${local.name_prefix}"
   target_key_id = aws_kms_key.this.id
+}
+
+# Account-wide, not per-workload: API Gateway needs this role set once per
+# account before any stage can enable CloudWatch access logging.
+resource "aws_iam_role" "apigateway_cloudwatch" {
+  name = "${local.name_prefix}-apigateway-cloudwatch"
+  tags = local.tags
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "apigateway.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "apigateway_cloudwatch" {
+  role       = aws_iam_role.apigateway_cloudwatch.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+}
+
+resource "aws_api_gateway_account" "this" {
+  cloudwatch_role_arn = aws_iam_role.apigateway_cloudwatch.arn
 }
 
 resource "aws_sns_topic" "alarms" {
@@ -194,28 +251,12 @@ resource "aws_budgets_budget" "monthly" {
   }
 }
 
-resource "aws_ce_anomaly_monitor" "workload" {
-  name              = local.name_prefix
-  monitor_type      = "DIMENSIONAL"
-  monitor_dimension = "SERVICE"
-}
-
-resource "aws_ce_anomaly_subscription" "workload" {
-  name             = local.name_prefix
-  frequency        = "DAILY"
-  monitor_arn_list = [aws_ce_anomaly_monitor.workload.arn]
-  subscriber {
-    type    = "SNS"
-    address = aws_sns_topic.alarms.arn
-  }
-  threshold_expression {
-    dimension {
-      key           = "ANOMALY_TOTAL_IMPACT_ABSOLUTE"
-      match_options = ["GREATER_THAN_OR_EQUAL"]
-      values        = ["50"]
-    }
-  }
-}
+# No aws_ce_anomaly_monitor here: AWS allows only one DIMENSIONAL/SERVICE cost
+# anomaly monitor per account, and this account already has one
+# ("AWS Service Monitor", auto-created outside Terraform). Subscribe that
+# existing monitor to alarm_email by hand in the Cost Anomaly Detection
+# console if per-service anomaly alerts are wanted; this budget alarm covers
+# the "spending is above budget" signal instead.
 
 resource "aws_cloudwatch_metric_alarm" "budget_anomaly_proxy" {
   alarm_name          = "${local.name_prefix}-cost-anomaly"

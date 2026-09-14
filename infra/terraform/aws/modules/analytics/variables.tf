@@ -40,6 +40,12 @@ variable "log_retention_days" {
   default = 30
 }
 
+variable "aggregate_reserved_concurrency" {
+  type        = number
+  description = "Reserved concurrency for the aggregate Lambda. Prod sizes 20 for tested peak; default here fits a fresh account's default 10 total concurrent executions."
+  default     = 2
+}
+
 variable "alarm_actions" {
   type    = list(string)
   default = []
