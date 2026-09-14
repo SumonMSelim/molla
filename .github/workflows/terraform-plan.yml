@@ -30,6 +30,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # The Lambda modules hash the zips at plan time, so the plan builds them
+      # exactly as deploy.yml does; the diff then covers code changes too.
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27"
+          cache: false
+
       - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: "1.16.2"
@@ -49,6 +56,9 @@ jobs:
           role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
+      - name: Build Lambda zips
+        run: make build-lambda GO=go
+
       - name: Init
         working-directory: ${{ env.TF_DIR }}
         run: terraform init -input=false
@@ -66,6 +76,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           terraform plan -no-color -input=false -lock=false \
+            -var "artifact_dir=${{ github.workspace }}/dist" \
             -var 'admin_principal_arns=${{ vars.ADMIN_PRINCIPAL_ARNS }}' \
             -var "alarm_email=${{ vars.ALARM_EMAIL }}" \
             -var "domain_name=${{ vars.DOMAIN_NAME }}" \
