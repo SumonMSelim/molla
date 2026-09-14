@@ -20,5 +20,6 @@ provider "aws" {
   }
 }
 
-# Authenticates with CLOUDFLARE_API_TOKEN (scope: Zone:DNS:Edit on the mol.la zone).
+# Authenticates with CLOUDFLARE_API_TOKEN scoped to the mol.la zone: Zone Read,
+# DNS Edit, Zone Settings Edit, Transform Rules Edit, Zone WAF Edit.
 provider "cloudflare" {}

@@ -85,6 +85,8 @@ resource "cloudflare_ruleset" "origin_verify" {
 # POST /api/v1/links is unauthenticated (no owner, no per-caller API key), so
 # Cloudflare's per-IP rate limit is the abuse control on public link creation.
 # API Gateway's stage throttle only bounds aggregate throughput, not one caller.
+# The zone is on the Free plan, which allows one rule with a fixed 10 second
+# period and 10 second mitigation timeout; 3 per 10s is roughly 10 per minute.
 resource "cloudflare_ruleset" "api_rate_limit" {
   count   = var.domain_name == "" ? 0 : 1
   zone_id = var.cloudflare_zone_id
@@ -97,10 +99,10 @@ resource "cloudflare_ruleset" "api_rate_limit" {
     enabled     = true
     action      = "block"
     ratelimit = {
-      characteristics     = ["ip.src"]
-      period              = 60
-      requests_per_period = 10
-      mitigation_timeout  = 600
+      characteristics     = ["ip.src", "cf.colo.id"] # cf.colo.id is mandatory for rate-limit rules
+      period              = 10
+      requests_per_period = 3
+      mitigation_timeout  = 10
     }
   }]
 }
