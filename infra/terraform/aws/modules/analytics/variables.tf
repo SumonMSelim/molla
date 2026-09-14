@@ -42,8 +42,8 @@ variable "log_retention_days" {
 
 variable "aggregate_reserved_concurrency" {
   type        = number
-  description = "Reserved concurrency for the aggregate Lambda. Prod sizes 20 for tested peak; default here fits a fresh account's default 10 total concurrent executions."
-  default     = 2
+  description = "Reserved concurrency for the aggregate Lambda. 0 leaves it unset (shares the account's unreserved pool), which is what a fresh account's default 10 total concurrent executions requires; prod sizes 20 for tested peak once the account limit is raised."
+  default     = 0
 }
 
 variable "alarm_actions" {

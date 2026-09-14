@@ -157,7 +157,7 @@ resource "aws_lambda_function" "aggregate" {
   architectures                  = ["arm64"]
   memory_size                    = 128
   timeout                        = 60
-  reserved_concurrent_executions = var.aggregate_reserved_concurrency
+  reserved_concurrent_executions = var.aggregate_reserved_concurrency > 0 ? var.aggregate_reserved_concurrency : null
   kms_key_arn                    = var.kms_key_arn
   tracing_config {
     mode = "Active"
