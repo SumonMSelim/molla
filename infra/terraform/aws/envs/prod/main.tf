@@ -87,6 +87,23 @@ resource "aws_kms_key" "this" {
             "kms:EncryptionContext:aws:logs:arn" = "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:*"
           }
         }
+      },
+      {
+        # CloudFront reads the UI bucket's SSE-KMS objects via OAC; S3
+        # checks this key's policy for that read, not just the bucket
+        # policy. Scoped to this account (not a specific distribution ARN)
+        # to avoid a cycle: the distribution needs this key for its own log
+        # group, so it can't be created first.
+        Sid       = "AllowCloudFrontOACDecrypt"
+        Effect    = "Allow"
+        Principal = { Service = "cloudfront.amazonaws.com" }
+        Action    = ["kms:Decrypt", "kms:DescribeKey"]
+        Resource  = "*"
+        Condition = {
+          StringEquals = {
+            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+          }
+        }
       }
     ]
   })
