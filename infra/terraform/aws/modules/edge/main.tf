@@ -303,6 +303,18 @@ resource "aws_lambda_permission" "cloudfront_redirect" {
   source_arn    = aws_cloudfront_distribution.this.arn
 }
 
+# Function URLs created since October 2025 require both
+# lambda:InvokeFunctionUrl and lambda:InvokeFunction to be granted.
+resource "aws_lambda_permission" "cloudfront_redirect_invoke" {
+  statement_id             = "AllowCloudFrontOACInvoke"
+  action                   = "lambda:InvokeFunction"
+  function_name            = var.redirect_function_arn
+  qualifier                = "live"
+  principal                = "cloudfront.amazonaws.com"
+  source_arn               = aws_cloudfront_distribution.this.arn
+  invoked_via_function_url = true
+}
+
 resource "aws_cloudwatch_log_group" "cf" {
   name              = "/aws/cloudfront/${var.name_prefix}"
   retention_in_days = var.log_retention_days
