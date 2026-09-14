@@ -8,6 +8,7 @@ on:
     branches: ["main"]
     paths:
       - "infra/terraform/aws/**"
+      - ".github/workflows/terraform-plan.yml"
 
 permissions:
   contents: read
@@ -52,14 +53,19 @@ jobs:
         working-directory: ${{ env.TF_DIR }}
         run: terraform init -input=false
 
+      # shell: bash turns on pipefail, so the tee below cannot mask terraform's
+      # exit code and turn a failed plan into a green check. -lock=false: the
+      # plan role is read-only by design and has no write access to the lock
+      # table; a plan never writes state, so it has nothing to protect.
       - name: Plan
         id: plan
         working-directory: ${{ env.TF_DIR }}
         continue-on-error: true
+        shell: bash
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          terraform plan -no-color -input=false \
+          terraform plan -no-color -input=false -lock=false \
             -var 'admin_principal_arns=${{ vars.ADMIN_PRINCIPAL_ARNS }}' \
             -var "alarm_email=${{ vars.ALARM_EMAIL }}" \
             -var "domain_name=${{ vars.DOMAIN_NAME }}" \
