@@ -122,8 +122,30 @@ resource "aws_iam_role_policy" "apply_iam" {
           "iam:PassRole",
           "iam:ListRolePolicies",
           "iam:ListAttachedRolePolicies",
+          "iam:ListRoleTags",
+          "iam:ListInstanceProfilesForRole",
+          "iam:UpdateRole",
+          "iam:UpdateRoleDescription",
+          "iam:UpdateAssumeRolePolicy",
         ]
         Resource = "arn:aws:iam::*:role/${var.name_prefix}-*"
+      },
+      {
+        # The OIDC provider is not a role, so the statement above doesn't
+        # cover it; without this the apply role can't even refresh it.
+        Sid    = "ManageGitHubOIDCProvider"
+        Effect = "Allow"
+        Action = [
+          "iam:GetOpenIDConnectProvider",
+          "iam:CreateOpenIDConnectProvider",
+          "iam:DeleteOpenIDConnectProvider",
+          "iam:UpdateOpenIDConnectProviderThumbprint",
+          "iam:TagOpenIDConnectProvider",
+          "iam:UntagOpenIDConnectProvider",
+          "iam:AddClientIDToOpenIDConnectProvider",
+          "iam:RemoveClientIDFromOpenIDConnectProvider",
+        ]
+        Resource = "arn:aws:iam::*:oidc-provider/token.actions.githubusercontent.com"
       },
       {
         Sid      = "ServiceLinkedRoles"
@@ -132,5 +154,21 @@ resource "aws_iam_role_policy" "apply_iam" {
         Resource = "*"
       }
     ]
+  })
+}
+
+# ReadOnlyAccess carries no kms:Decrypt, and the provider reads SSM
+# SecureString parameters with decryption, so refreshing them during plan
+# needs this on the workload key.
+resource "aws_iam_role_policy" "plan_kms" {
+  name = "decrypt-workload-key"
+  role = aws_iam_role.plan.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["kms:Decrypt", "kms:DescribeKey"]
+      Resource = var.kms_key_arn
+    }]
   })
 }

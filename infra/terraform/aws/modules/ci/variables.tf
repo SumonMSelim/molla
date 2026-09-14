@@ -19,6 +19,11 @@ variable "github_plan_environment" {
   default     = "production-plan"
 }
 
+variable "kms_key_arn" {
+  type        = string
+  description = "Workload KMS key. The plan role needs kms:Decrypt on it to refresh SSM SecureString parameters."
+}
+
 variable "tags" {
   type = map(string)
 }

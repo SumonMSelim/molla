@@ -290,7 +290,9 @@ resource "aws_cloudfront_distribution" "this" {
     cloudfront_default_certificate = var.domain_name == ""
     acm_certificate_arn            = var.domain_name == "" ? null : aws_acm_certificate.this[0].arn
     ssl_support_method             = var.domain_name == "" ? null : "sni-only"
-    minimum_protocol_version       = "TLSv1.2_2021"
+    # With the default CloudFront certificate AWS forces TLSv1 and silently
+    # ignores anything stricter, which otherwise shows as drift on every plan.
+    minimum_protocol_version = var.domain_name == "" ? "TLSv1" : "TLSv1.2_2021"
   }
 }
 
