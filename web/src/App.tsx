@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AboutPage } from './pages/About.tsx'
 import { CreatePage } from './pages/Create.tsx'
+import { DevelopersPage } from './pages/Developers.tsx'
 import { PrivacyPage } from './pages/Privacy.tsx'
 import { TermsPage } from './pages/Terms.tsx'
 
@@ -28,6 +29,9 @@ export function App() {
 
   if (path === '/app/about' || path === '/app/about/') {
     return <AboutPage />
+  }
+  if (path === '/app/developers' || path === '/app/developers/') {
+    return <DevelopersPage />
   }
   if (path === '/app/terms' || path === '/app/terms/') {
     return <TermsPage />
