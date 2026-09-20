@@ -56,7 +56,7 @@ jobs:
         run: make build-lambda GO=go
 
       - name: Build web app
-        run: make web-build NPM=npm
+        run: make web-build NPM=npm VITE_APP_VERSION="${{ github.ref_type == 'tag' && github.ref_name || github.sha }}"
 
       - name: Terraform init
         working-directory: ${{ env.TF_DIR }}

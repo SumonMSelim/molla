@@ -9,7 +9,9 @@ TF_DIR     := infra/terraform/aws
 DOCKER_GO = docker run --rm -v "$(CURDIR)":/src -w /src \
 	-v molla-mod:/go/pkg/mod -v molla-build:/root/.cache/go-build \
 	-e GOFLAGS=-buildvcs=false $(GO_IMAGE)
-DOCKER_NPM = docker run --rm -v "$(CURDIR)/web":/src -w /src $(NODE_IMAGE) npm
+VITE_APP_VERSION ?= dev
+DOCKER_NPM = docker run --rm -v "$(CURDIR)/web":/src -w /src \
+	-e VITE_APP_VERSION=$(VITE_APP_VERSION) $(NODE_IMAGE) npm
 GO    ?= $(DOCKER_GO) go
 GOFMT ?= $(DOCKER_GO) gofmt
 NPM   ?= $(DOCKER_NPM)

@@ -65,10 +65,10 @@
     @apply border-border outline-ring/50;
   }
   html {
-    @apply font-sans;
+    @apply overflow-x-hidden font-sans;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply overflow-x-hidden bg-background text-foreground;
   }
 }
 
@@ -100,11 +100,11 @@
   0%,
   100% {
     opacity: 0.55;
-    transform: scale(1);
+    transform: scaleY(1);
   }
   50% {
     opacity: 1;
-    transform: scale(1.06);
+    transform: scaleY(1.06);
   }
 }
 

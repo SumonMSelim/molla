@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { appVersion } from '../version.ts'
 
 const links = [
   { href: '/app/about', label: 'About' },
@@ -18,9 +19,9 @@ export function Chrome({
 }) {
   const max = width === 'prose' ? 'max-w-2xl' : 'max-w-3xl'
   return (
-    <div className="relative flex min-h-svh flex-col bg-background bg-dot-grid">
+    <div className="relative flex min-h-svh flex-col overflow-x-hidden bg-background bg-dot-grid">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[32rem] origin-top animate-ambient-pulse bg-[radial-gradient(ellipse_at_top,var(--glow),transparent_60%)]" />
-      <div className={`relative mx-auto flex w-full flex-1 flex-col ${max} px-6 py-10 sm:py-16`}>
+      <div className={`relative mx-auto flex w-full min-w-0 flex-1 flex-col ${max} px-6 py-10 sm:py-16`}>
         <header className="mb-10 flex animate-fade-up items-center justify-between gap-4">
           <a href="/app/" className="font-mono text-sm font-medium tracking-tight text-brand glow-text">
             mol.la
@@ -29,14 +30,16 @@ export function Chrome({
         </header>
         <div className="flex-1">{children}</div>
         <footer className="mt-16 flex flex-col gap-3 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <nav className="flex gap-4" aria-label="Legal">
+          <nav className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Legal">
             {links.map((link) => (
               <a key={link.href} href={link.href} className="hover:text-foreground">
                 {link.label}
               </a>
             ))}
           </nav>
-          <p>© 2026 Muhammad Sumon Molla Selim</p>
+          <p>
+            © 2026 Muhammad Sumon Molla Selim · <span className="font-mono">{appVersion()}</span>
+          </p>
         </footer>
       </div>
     </div>
