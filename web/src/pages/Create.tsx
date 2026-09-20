@@ -74,6 +74,12 @@ export function CreatePage({ selected, onOpen, onClear }: CreatePageProps) {
           <p className="mx-auto mt-5 max-w-md text-prose text-muted-foreground text-balance">
             Paste a URL, get a short one back. No sign-up, no waiting: anyone can create a link.
           </p>
+          <p className="mt-5 text-xs text-muted-foreground">
+            Integrating from your app?{' '}
+            <a href="/app/developers" className="font-medium text-brand-text hover:text-foreground">
+              Developers API docs
+            </a>
+          </p>
         </div>
 
         <form onSubmit={onSubmit} className="relative animate-fade-up pt-5 [animation-delay:80ms]">

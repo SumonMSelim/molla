@@ -9,11 +9,16 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Shorten a long link' })).toBeInTheDocument()
   })
 
-  it('shows about, terms, and privacy', () => {
+  it('shows about, developers, terms, and privacy', () => {
     window.history.replaceState(null, '', '/app/about')
     const about = render(<App />)
     expect(screen.getByRole('heading', { name: 'About' })).toBeInTheDocument()
     about.unmount()
+
+    window.history.replaceState(null, '', '/app/developers')
+    const developers = render(<App />)
+    expect(screen.getByRole('heading', { name: 'Developers' })).toBeInTheDocument()
+    developers.unmount()
 
     window.history.replaceState(null, '', '/app/terms')
     const terms = render(<App />)

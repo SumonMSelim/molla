@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 
 const links = [
   { href: '/app/about', label: 'About' },
+  { href: '/app/developers', label: 'Developers' },
   { href: '/app/terms', label: 'Terms' },
   { href: '/app/privacy', label: 'Privacy' },
 ] as const
