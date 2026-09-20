@@ -64,7 +64,7 @@ export function CreatePage({ selected, onOpen, onClear }: CreatePageProps) {
   return (
     <Chrome>
         <div className="animate-fade-up pb-10 text-center sm:pb-14">
-          <p className="font-mono text-xs font-medium tracking-[0.2em] text-brand-text uppercase glow-text">
+          <p className="px-1 font-mono text-xs font-medium tracking-[0.12em] text-balance text-brand-text uppercase glow-text sm:tracking-[0.2em]">
             open · public · no personal data collected
           </p>
           <h1 className="mt-4 text-display font-semibold text-balance">

@@ -24,7 +24,7 @@ role is itself created by this Terraform configuration (`modules/ci`). The
 very first apply has to happen from an operator workstation with short-lived
 credentials; every apply after that can run from Actions.
 
-1. Create the Terraform state bucket and DynamoDB lock table named in `infra/terraform/aws/envs/prod/backend.tf`.
+1. Create the Terraform state bucket named in `infra/terraform/aws/envs/prod/backend.tf`. Locking uses an S3 lockfile (`use_lockfile`), not DynamoDB.
 2. `make build-lambda` then pass `-var artifact_dir=../../../../../dist` (from `envs/prod`) or copy zips next to the env.
 3. `permutation_key`, `privacy_key`, `redis_auth_token`, and `origin_verify_secret` are optional: leave them unset and Terraform generates and stores random values on first apply (see `random_password` resources in `envs/prod/main.tf`). Set them only to pin a specific value.
 4. Set tfvars: `admin_principal_arns`, `github_repository` (`SumonMSelim/molla`). Prod also needs `alarm_email`, `budget_limit`, and central trail/config/guardduty IDs.

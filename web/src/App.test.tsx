@@ -7,6 +7,7 @@ describe('App', () => {
     window.history.replaceState(null, '', '/app/')
     render(<App />)
     expect(screen.getByRole('heading', { name: 'Shorten a long link' })).toBeInTheDocument()
+    expect(screen.getByText('dev')).toBeInTheDocument()
   })
 
   it('shows about, developers, terms, and privacy', () => {
