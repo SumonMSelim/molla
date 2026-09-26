@@ -1,9 +1,9 @@
 # GitHub Actions authenticates to AWS via OIDC: no long-lived access keys are
 # stored in GitHub. Two roles: molla-gha-plan (read-only, runs on every PR
 # touching infra/terraform/aws) and molla-gha-apply (full workload write,
-# runs only on a v* tag push or a manual workflow_dispatch, both gated by the
-# github_environment so a human approval is required in GitHub before the
-# role can be assumed).
+# runs only on a v* tag push or a manual workflow_dispatch, both under the
+# github_environment, which GitHub restricts to v*.*.* tags; there is no
+# required reviewer, so a release deploys without a human approval).
 
 data "tls_certificate" "github" {
   url = "https://token.actions.githubusercontent.com/.well-known/openid-configuration"
@@ -29,9 +29,9 @@ locals {
     "repo:${var.github_repository}:environment:${var.github_environment}",
     "repo:${local.github_owner}@*/${local.github_repo}@*:environment:${var.github_environment}",
   ]
-  # Separate, unprotected environment for the plan role: it has no required
-  # reviewer, so terraform-plan stays a fully automatic PR check instead of
-  # blocking on the same approval as a deploy.
+  # Separate, unrestricted environment for the plan role: production only
+  # accepts v*.*.* tags, so terraform-plan could not run on PR branches under
+  # it.
   oidc_sub_plan = [
     "repo:${var.github_repository}:environment:${var.github_plan_environment}",
     "repo:${local.github_owner}@*/${local.github_repo}@*:environment:${var.github_plan_environment}",

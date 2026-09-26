@@ -64,8 +64,9 @@ never plans or applies Terraform. Terraform plan runs in
 `terraform-plan.yml` on every PR touching `infra/terraform/aws` (read-only,
 posts the diff as a PR comment); apply runs in `deploy.yml`, triggered only
 by a `vX.Y.Z` tag push or a manual `workflow_dispatch`, never by a plain
-merge to `main`. Both are gated by the `production` GitHub Environment's
-required reviewer, and both authenticate to AWS via OIDC — no long-lived
+merge to `main`. Deploys run under the `production` GitHub Environment,
+which only accepts `v*.*.*` tags and has no required reviewer, so publishing
+a release deploys immediately. Both authenticate to AWS via OIDC — no long-lived
 AWS keys are stored in GitHub.
 
 ```sh

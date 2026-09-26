@@ -1,8 +1,9 @@
 name: Deploy
 
 # Applies infra/terraform/aws/envs/prod and ships Lambda + web artifacts.
-# Never runs on a merge to main: only a v* tag push or an explicit manual
-# dispatch, both gated by the production environment's required reviewer.
+# Never runs on a merge to main: only a v* tag push (publishing a release) or
+# a manual dispatch run on a v* tag. The production environment accepts only
+# v*.*.* tags and has no required reviewer, so a release deploys immediately.
 on:
   push:
     tags: ["v*.*.*"]
