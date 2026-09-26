@@ -131,6 +131,19 @@ resource "aws_cloudfront_response_headers_policy" "security" {
       access_control_max_age_sec = 31536000
       override                   = true
     }
+    # Sent as a header because browsers ignore frame-ancestors in the
+    # index.html meta tag. Keep the two policies in sync.
+    content_security_policy {
+      content_security_policy = "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'"
+      override                = true
+    }
+  }
+
+  # S3 SSE-KMS headers expose the AWS account ID and KMS key ARN to viewers.
+  remove_headers_config {
+    items { header = "x-amz-server-side-encryption" }
+    items { header = "x-amz-server-side-encryption-aws-kms-key-id" }
+    items { header = "x-amz-server-side-encryption-bucket-key-enabled" }
   }
 }
 
