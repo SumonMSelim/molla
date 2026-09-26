@@ -22,8 +22,8 @@ Apply, key seeding, UI sync, takedown, restore, and regional failure: `docs/RUNB
 
 `ci.yml` never plans or applies. Plan runs read-only in `terraform-plan.yml`
 on every PR touching this directory; apply runs in `deploy.yml`, triggered
-only by a `vX.Y.Z` tag push or a manual `workflow_dispatch` gated by a
-required reviewer on the `production` GitHub Environment -- never by a
-merge to `main`. Both authenticate via OIDC (`modules/ci`), so no AWS keys
+only by a `vX.Y.Z` tag push or a manual `workflow_dispatch` on a `v*` tag,
+under the `production` GitHub Environment (tags `v*.*.*` only, no required
+reviewer) -- never by a merge to `main`. Both authenticate via OIDC (`modules/ci`), so no AWS keys
 are stored in GitHub. The very first apply still has to happen by hand,
 since it creates those OIDC roles: see `docs/RUNBOOK.md`.

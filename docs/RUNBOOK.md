@@ -4,8 +4,9 @@ Operator procedures for mol.la on AWS. `ci.yml` never plans or applies
 Terraform and never runs k6 against any environment; it only builds and
 tests. Terraform plan and apply run in `terraform-plan.yml` (every PR
 touching `infra/terraform/aws`, read-only) and `deploy.yml` (a `vX.Y.Z` tag
-push or a manual `workflow_dispatch`, never a plain merge to `main`), both
-gated by the `production` GitHub Environment's required reviewer.
+push or a manual `workflow_dispatch`, never a plain merge to `main`).
+Deploys run under the `production` GitHub Environment, which only accepts
+`v*.*.*` tags and has no required reviewer.
 
 ## Launch SLOs
 
@@ -36,7 +37,7 @@ credentials; every apply after that can run from Actions.
 
 ## GitHub Actions setup (one-time, after the first manual apply)
 
-1. In the repo's Settings → Environments, create `production` with a required reviewer. Every `terraform-plan.yml` and `deploy.yml` run waits for that approval before the OIDC role can be assumed.
+1. In the repo's Settings → Environments, create `production` and limit its deployment branches and tags to the tag pattern `v*.*.*`. No required reviewer: publishing a release deploys immediately. A manual `workflow_dispatch` must be run on a `v*` tag, not a branch.
 2. Set these as Environment **variables** (not secrets -- OIDC needs no long-lived AWS credentials):
    - `AWS_REGION` -- `us-east-1`.
    - `AWS_PLAN_ROLE_ARN` -- `terraform output -raw gha_plan_role_arn`.

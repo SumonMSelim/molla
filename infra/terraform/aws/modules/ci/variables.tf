@@ -15,7 +15,7 @@ variable "github_environment" {
 
 variable "github_plan_environment" {
   type        = string
-  description = "GitHub Environment name for the read-only plan role. Separate from github_environment so a required reviewer on deploys doesn't also gate every PR's automatic plan check."
+  description = "GitHub Environment name for the read-only plan role. Separate from github_environment because that one only accepts v*.*.* tags, which would block every PR's automatic plan check."
   default     = "production-plan"
 }
 
