@@ -74,6 +74,20 @@ resource "cloudflare_zone_setting" "security_header" {
   }
 }
 
+# Bot protection is off by choice. JavaScript detections inject an inline
+# script that the site's CSP (script-src 'self') blocks, and Bot Fight Mode
+# challenges scanners with a page carrying Cloudflare's own CSP. The API resets
+# omitted fields on update, so every protection is pinned explicitly.
+resource "cloudflare_bot_management" "this" {
+  count                   = var.domain_name == "" ? 0 : 1
+  zone_id                 = var.cloudflare_zone_id
+  enable_js               = false
+  fight_mode              = false
+  ai_bots_protection      = "disabled"
+  crawler_protection      = "disabled"
+  content_bots_protection = "disabled"
+}
+
 # Cloudflare stamps every origin request with a shared secret; the CloudFront
 # viewer-request function rejects requests without it, so traffic cannot bypass
 # the Cloudflare firewall by hitting the *.cloudfront.net hostname directly.
