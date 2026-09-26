@@ -57,6 +57,23 @@ resource "cloudflare_zone_setting" "ssl" {
   value      = "strict"
 }
 
+# Cloudflare overwrites the origin's HSTS header with this one. The preload
+# list requires a max-age of at least one year.
+resource "cloudflare_zone_setting" "security_header" {
+  count      = var.domain_name == "" ? 0 : 1
+  zone_id    = var.cloudflare_zone_id
+  setting_id = "security_header"
+  value = {
+    strict_transport_security = {
+      enabled            = true
+      max_age            = 31536000
+      include_subdomains = true
+      preload            = true
+      nosniff            = true
+    }
+  }
+}
+
 # Cloudflare stamps every origin request with a shared secret; the CloudFront
 # viewer-request function rejects requests without it, so traffic cannot bypass
 # the Cloudflare firewall by hitting the *.cloudfront.net hostname directly.
