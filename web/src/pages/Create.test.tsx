@@ -24,6 +24,7 @@ describe('CreatePage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create short link' }))
 
     expect(await screen.findByText('http://127.0.0.1:8080/alias01')).toBeInTheDocument()
+    expect(screen.getByTitle('QR code for http://127.0.0.1:8080/alias01').closest('svg')).toBeInTheDocument()
     const headers = (fetchMock.mock.calls[0][1] as RequestInit).headers as Record<string, string>
     expect(headers['X-Api-Key']).toBeUndefined()
     expect(headers['Idempotency-Key']).toBe('idem-create')
