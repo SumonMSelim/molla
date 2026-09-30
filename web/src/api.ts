@@ -93,6 +93,7 @@ export type CreateLinkResult = {
 
 export type LinkStats = {
   short_code: string
+  short_url: string
   clicks: number
   created_at: string
   last_click_at?: string

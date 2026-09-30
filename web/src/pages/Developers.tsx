@@ -53,6 +53,7 @@ export function DevelopersPage() {
         <pre className="overflow-x-auto border border-border bg-card p-3 text-xs text-foreground">
 {`{
   "short_code": "abc1234",
+  "short_url": "https://mol.la/abc1234",
   "clicks": 42,
   "created_at": "2026-09-20T00:00:00Z",
   "last_click_at": "2026-09-20T12:30:00Z"

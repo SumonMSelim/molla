@@ -7,12 +7,14 @@ describe('LinkPage', () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      text: async () => JSON.stringify({ short_code: 'statzzz', clicks: 4, created_at: '2026-09-13T00:00:00Z' }),
+      text: async () => JSON.stringify({ short_code: 'statzzz', short_url: 'https://mol.la/statzzz', clicks: 4, created_at: '2026-09-13T00:00:00Z' }),
     })
     vi.stubGlobal('fetch', fetchMock)
     render(<LinkPage code="statzzz" onBack={() => undefined} />)
 
     expect(await screen.findByText('4')).toBeInTheDocument()
+    expect(screen.getByTitle('QR code for https://mol.la/statzzz').closest('svg')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Download PNG' })).toBeInTheDocument()
     const headers = (fetchMock.mock.calls[0][1] as RequestInit).headers as Record<string, string>
     expect(headers['X-Api-Key']).toBeUndefined()
   })
@@ -21,7 +23,7 @@ describe('LinkPage', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      text: async () => JSON.stringify({ short_code: 'statzzz', clicks: 4, created_at: '2026-09-13T00:00:00Z' }),
+      text: async () => JSON.stringify({ short_code: 'statzzz', short_url: 'https://mol.la/statzzz', clicks: 4, created_at: '2026-09-13T00:00:00Z' }),
     }))
     const onBack = vi.fn()
     render(<LinkPage code="statzzz" onBack={onBack} />)

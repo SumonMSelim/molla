@@ -12,6 +12,7 @@ import (
 
 type statsResponse struct {
 	ShortCode   string `json:"short_code"`
+	ShortURL    string `json:"short_url"`
 	Clicks      int64  `json:"clicks"`
 	CreatedAt   string `json:"created_at"`
 	LastClickAt string `json:"last_click_at,omitempty"`
@@ -53,6 +54,7 @@ func (a *API) stats(w http.ResponseWriter, r *http.Request) {
 
 	resp := statsResponse{
 		ShortCode: link.ShortCode,
+		ShortURL:  a.publicBase + "/" + link.ShortCode,
 		Clicks:    record.Clicks,
 		CreatedAt: link.CreatedAt.UTC().Format(time.RFC3339),
 	}
