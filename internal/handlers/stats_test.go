@@ -23,7 +23,7 @@ func TestStatsClicksAndZeroDefault(t *testing.T) {
 		t.Fatalf("status = %d %s", zero.Code, zero.Body.String())
 	}
 	got := decodeStats(t, zero)
-	if got.ShortCode != "statzzz" || got.Clicks != 0 || got.CreatedAt != "2026-09-12T00:00:00Z" || got.LastClickAt != "" {
+	if got.ShortCode != "statzzz" || got.ShortURL != "https://mol.la/statzzz" || got.Clicks != 0 || got.CreatedAt != "2026-09-12T00:00:00Z" || got.LastClickAt != "" {
 		t.Fatalf("zero stats = %+v", got)
 	}
 

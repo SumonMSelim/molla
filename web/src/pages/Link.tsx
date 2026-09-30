@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
 import { ApiError, forgetLink, getStats, type LinkStats } from '../api.ts'
+import { QrCode } from './QrCode.tsx'
 
 type LinkPageProps = {
   code: string
   onBack: () => void
   onForgotten?: (code: string) => void
+  showQr?: boolean
 }
 
-export function LinkPage({ code, onBack, onForgotten }: LinkPageProps) {
+export function LinkPage({ code, onBack, onForgotten, showQr = true }: LinkPageProps) {
   const [stats, setStats] = useState<LinkStats | null>(null)
   const [error, setError] = useState('')
 
@@ -71,6 +73,12 @@ export function LinkPage({ code, onBack, onForgotten }: LinkPageProps) {
             <dd className="font-mono text-xs">{stats.last_click_at ?? 'None yet'}</dd>
           </div>
         </dl>
+      ) : null}
+
+      {stats && showQr ? (
+        <div className="mt-5">
+          <QrCode url={stats.short_url} code={stats.short_code} />
+        </div>
       ) : null}
 
       <button
