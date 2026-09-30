@@ -1,4 +1,5 @@
 import { useId, useState, type FormEvent } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
 import { ApiError, createLink, rememberLink, type StoredLink } from '../api.ts'
 import { Chrome } from './Chrome.tsx'
 import { LinkPage } from './Link.tsx'
@@ -167,6 +168,16 @@ export function CreatePage({ selected, onOpen, onClear }: CreatePageProps) {
             >
               {copied ? 'Copied' : 'Copy'}
             </button>
+            <p className="mt-6 text-xs font-medium tracking-[0.04em] text-muted-foreground uppercase">QR code</p>
+            <QRCodeSVG
+              value={created.short_url}
+              title={`QR code for ${created.short_url}`}
+              size={160}
+              marginSize={2}
+              bgColor="#ffffff"
+              fgColor="#000000"
+              className="mt-3 border border-border"
+            />
           </div>
         ) : null}
 
