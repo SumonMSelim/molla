@@ -1,75 +1,11 @@
 data "aws_caller_identity" "current" {}
 
-resource "aws_s3_bucket" "archive" {
-  bucket = "${var.name_prefix}-click-archive-${data.aws_caller_identity.current.account_id}"
-  tags   = var.tags
-}
-
-resource "aws_s3_bucket_public_access_block" "archive" {
-  bucket                  = aws_s3_bucket.archive.id
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "archive" {
-  bucket = aws_s3_bucket.archive.id
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm     = "aws:kms"
-      kms_master_key_id = var.kms_key_arn
-    }
-    bucket_key_enabled = true
-  }
-}
-
-resource "aws_s3_bucket_lifecycle_configuration" "archive" {
-  bucket = aws_s3_bucket.archive.id
-  rule {
-    id     = "expire-90d"
-    status = "Enabled"
-    filter {
-    }
-    expiration {
-      days = 90
-    }
-  }
-}
-
-resource "aws_s3_bucket_policy" "archive" {
-  bucket = aws_s3_bucket.archive.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid       = "DenyInsecureTransport"
-        Effect    = "Deny"
-        Principal = "*"
-        Action    = "s3:*"
-        Resource = [
-          aws_s3_bucket.archive.arn,
-          "${aws_s3_bucket.archive.arn}/*",
-        ]
-        Condition = {
-          Bool = { "aws:SecureTransport" = "false" }
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_kinesis_stream" "clicks" {
-  name             = "${var.name_prefix}-clicks"
-  shard_count      = var.stream_mode == "PROVISIONED" ? var.shard_count : null
-  encryption_type  = "KMS"
-  kms_key_id       = var.kms_key_arn
-  retention_period = 24
-  stream_mode_details {
-    stream_mode = var.stream_mode
-  }
-  tags = var.tags
-}
+# Click analytics: the Clicks table's DynamoDB Stream (owned by modules/data)
+# feeds the aggregate Lambda, which folds a batch into one UpdateItem per code
+# on LinkStats. Raw events live in the Clicks table itself under a 90-day TTL,
+# so there is no Kinesis stream, no Firehose, and no archive bucket. Lambda
+# reads from DynamoDB Streams are free, and the redirect Lambda writes clicks
+# through the free gateway endpoint, so this path has no fixed monthly cost.
 
 resource "aws_sqs_queue" "aggregate_dlq" {
   name                      = "${var.name_prefix}-aggregate-dlq"
@@ -110,22 +46,15 @@ resource "aws_iam_role_policy" "aggregate" {
         Resource = "${aws_cloudwatch_log_group.aggregate.arn}:*"
       },
       {
+        Sid    = "ClicksStream"
         Effect = "Allow"
         Action = [
-          "kinesis:DescribeStream",
-          "kinesis:DescribeStreamSummary",
-          "kinesis:GetRecords",
-          "kinesis:GetShardIterator",
-          "kinesis:ListShards",
-          "kinesis:ListStreams",
-          "kinesis:SubscribeToShard",
+          "dynamodb:DescribeStream",
+          "dynamodb:GetRecords",
+          "dynamodb:GetShardIterator",
+          "dynamodb:ListStreams",
         ]
-        Resource = aws_kinesis_stream.clicks.arn
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["kinesis:ListStreams"]
-        Resource = "*"
+        Resource = var.clicks_stream_arn
       },
       {
         Sid      = "StatsTable"
@@ -172,7 +101,7 @@ resource "aws_lambda_function" "aggregate" {
 }
 
 resource "aws_lambda_event_source_mapping" "clicks" {
-  event_source_arn                   = aws_kinesis_stream.clicks.arn
+  event_source_arn                   = var.clicks_stream_arn
   function_name                      = aws_lambda_function.aggregate.arn
   starting_position                  = "LATEST"
   batch_size                         = 100
@@ -185,85 +114,27 @@ resource "aws_lambda_event_source_mapping" "clicks" {
       destination_arn = aws_sqs_queue.aggregate_dlq.arn
     }
   }
-}
-
-resource "aws_iam_role" "firehose" {
-  name = "${var.name_prefix}-firehose"
-  tags = var.tags
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action    = "sts:AssumeRole"
-      Effect    = "Allow"
-      Principal = { Service = "firehose.amazonaws.com" }
-    }]
-  })
-}
-
-resource "aws_iam_role_policy" "firehose" {
-  name = "firehose"
-  role = aws_iam_role.firehose.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:AbortMultipartUpload",
-          "s3:GetBucketLocation",
-          "s3:GetObject",
-          "s3:ListBucket",
-          "s3:ListBucketMultipartUploads",
-          "s3:PutObject",
-        ]
-        Resource = [aws_s3_bucket.archive.arn, "${aws_s3_bucket.archive.arn}/*"]
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["kinesis:DescribeStream", "kinesis:GetShardIterator", "kinesis:GetRecords", "kinesis:ListShards"]
-        Resource = aws_kinesis_stream.clicks.arn
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
-        Resource = var.kms_key_arn
-      }
-    ]
-  })
-}
-
-resource "aws_kinesis_firehose_delivery_stream" "archive" {
-  name        = "${var.name_prefix}-click-archive"
-  destination = "extended_s3"
-  kinesis_source_configuration {
-    kinesis_stream_arn = aws_kinesis_stream.clicks.arn
-    role_arn           = aws_iam_role.firehose.arn
+  # Only INSERTs carry a click; TTL sweeps arrive as REMOVE and would be
+  # billed invocations that count nothing. Filter them out at the source.
+  filter_criteria {
+    filter {
+      pattern = jsonencode({ eventName = ["INSERT"] })
+    }
   }
-  extended_s3_configuration {
-    role_arn            = aws_iam_role.firehose.arn
-    bucket_arn          = aws_s3_bucket.archive.arn
-    prefix              = "year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
-    error_output_prefix = "errors/"
-    compression_format  = "GZIP"
-    kms_key_arn         = var.kms_key_arn
-    buffering_interval  = 300
-    buffering_size      = 64
-  }
-  tags = var.tags
 }
 
 resource "aws_cloudwatch_metric_alarm" "iterator_age" {
-  alarm_name          = "${var.name_prefix}-kinesis-iterator-age"
-  alarm_description   = "Owner: platform. Action: scale shards or inspect aggregator errors."
+  alarm_name          = "${var.name_prefix}-clicks-iterator-age"
+  alarm_description   = "Owner: platform. Action: inspect aggregator errors and throttles; stream records are falling behind."
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 3
-  metric_name         = "GetRecords.IteratorAgeMilliseconds"
-  namespace           = "AWS/Kinesis"
+  metric_name         = "IteratorAge"
+  namespace           = "AWS/Lambda"
   period              = 60
   statistic           = "Maximum"
   threshold           = 60000
   alarm_actions       = var.alarm_actions
-  dimensions          = { StreamName = aws_kinesis_stream.clicks.name }
+  dimensions          = { FunctionName = aws_lambda_function.aggregate.function_name }
   tags                = var.tags
 }
 

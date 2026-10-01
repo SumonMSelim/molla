@@ -20,7 +20,7 @@ func withRedirectEnv(t *testing.T) {
 	mini := miniredis.RunT(t)
 	t.Setenv("MOLLA_AWS_ENDPOINT", srv.URL)
 	t.Setenv("MOLLA_REDIS_ADDR", mini.Addr())
-	t.Setenv("MOLLA_CLICK_STREAM", "clicks")
+	t.Setenv("MOLLA_CLICKS_TABLE", "clicks")
 }
 
 func TestNewHandlerRequiresPrivacyKey(t *testing.T) {
@@ -30,17 +30,17 @@ func TestNewHandlerRequiresPrivacyKey(t *testing.T) {
 	}
 }
 
-func TestNewHandlerRequiresRedisAndStream(t *testing.T) {
+func TestNewHandlerRequiresRedisAndClicksTable(t *testing.T) {
 	t.Setenv("MOLLA_PRIVACY_KEY", "privacy-test-key")
 	t.Setenv("MOLLA_REDIS_ADDR", "")
-	t.Setenv("MOLLA_CLICK_STREAM", "clicks")
+	t.Setenv("MOLLA_CLICKS_TABLE", "clicks")
 	if _, err := newHandler(); err == nil {
 		t.Fatal("expected redis error")
 	}
 	t.Setenv("MOLLA_REDIS_ADDR", "127.0.0.1:6379")
-	t.Setenv("MOLLA_CLICK_STREAM", "")
+	t.Setenv("MOLLA_CLICKS_TABLE", "")
 	if _, err := newHandler(); err == nil {
-		t.Fatal("expected stream error")
+		t.Fatal("expected clicks table error")
 	}
 }
 

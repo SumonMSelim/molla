@@ -23,7 +23,7 @@ export function PrivacyPage() {
             daily. We do not collect browser or referrer information.
           </li>
           <li>Click totals are approximate; edge cache hits are not counted the same way as direct hits.</li>
-          <li>Raw click-event records are kept for 90 days in an encrypted archive, then deleted.</li>
+          <li>Raw click-event records are kept for 90 days in an encrypted table, then deleted.</li>
           <li>A removed link is marked inactive immediately; the underlying record is deleted roughly 30 days later.</li>
         </ul>
         <h2>Network path</h2>

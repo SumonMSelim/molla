@@ -25,3 +25,11 @@ output "idempotency_table_name" {
 output "credentials_table_name" {
   value = aws_dynamodb_table.this["credentials"].name
 }
+
+output "clicks_table_name" {
+  value = aws_dynamodb_table.this["clicks"].name
+}
+
+output "clicks_stream_arn" {
+  value = aws_dynamodb_table.this["clicks"].stream_arn
+}

@@ -27,7 +27,7 @@ Required before production:
 - Define workload owner, escalation path, service-level indicators, dashboards, and alarm actions.
 - Add deployment runbooks with reviewed plan, canary or weighted Lambda alias rollout, automatic alarm-based rollback, and rollback verification.
 - Make operational changes small, reversible, and observable.
-- Run game days for Redis failover, DynamoDB throttling, Kinesis lag, invalidation failure, expired credentials, and restore procedures.
+- Run game days for Redis failover, DynamoDB throttling, Clicks stream lag, invalidation failure, expired credentials, and restore procedures.
 - Track post-incident actions and feed them back into design and runbooks.
 
 ## Security
@@ -55,6 +55,7 @@ Required before production:
 Aligned design:
 
 - Managed regional services provide Multi-AZ resilience; Redis has automatic failover.
+- Click events are DynamoDB items with a 90-day TTL; DynamoDB Streams feeds the aggregator, so the analytics path has no Kinesis stream, no Firehose, and no interface endpoint to size or pay for.
 - DynamoDB is authoritative; Redis is disposable and cache failures fall back safely.
 - Link creation and idempotency are one DynamoDB transaction.
 - Deletes are durable, versioned, retryable, and report failure until cache invalidation succeeds.
@@ -62,9 +63,9 @@ Aligned design:
 
 Required before production:
 
-- Enumerate Lambda concurrency, API Gateway, DynamoDB, Kinesis, VPC ENI, and WAF quotas; maintain at least 20% peak headroom and alarm on consumption.
+- Enumerate Lambda concurrency, API Gateway, DynamoDB, VPC ENI, and WAF quotas; maintain at least 20% peak headroom and alarm on consumption.
 - Configure bounded retries with jitter, timeouts shorter than caller budgets, reserved concurrency where isolation is required, and dead-letter/on-failure destinations for asynchronous consumers.
-- Verify partial-batch failure handling for Kinesis consumers.
+- Verify partial-batch failure handling for the DynamoDB Streams consumer.
 - Run sustained peak and burst load tests, including cache-cold and dependency-degraded cases.
 - Automate periodic DynamoDB restore tests and verify data integrity plus measured RPO/RTO.
 - Document the accepted regional-outage risk and recovery communication without implying automated regional failover.
@@ -84,7 +85,7 @@ Required before production:
 - Load-test p50, p95, and p99 latency at expected peak and burst traffic.
 - Tune Lambda memory and provisioned concurrency using measured results and Lambda Power Tuning or Compute Optimizer.
 - Measure CloudFront, Redis, and DynamoDB hit rates; replace design assumptions with production telemetry.
-- Alarm on latency, throttles, errors, concurrency saturation, cache evictions, and Kinesis iterator age.
+- Alarm on latency, throttles, errors, concurrency saturation, cache evictions, and aggregate Lambda iterator age.
 
 ## Cost optimization
 
@@ -100,7 +101,7 @@ Required before production:
 - Apply mandatory workload, environment, owner, and cost-center tags where supported.
 - Configure AWS Budgets and Cost Anomaly Detection with named responders.
 - Validate estimates with the AWS Pricing Calculator using measured payload sizes and request counts.
-- Review CloudFront price class or flat-rate plans, WAF request charges, Kinesis mode/shards, log volume, provisioned concurrency, and Redis node size.
+- Review CloudFront price class or flat-rate plans, WAF request charges, Clicks table write volume, log volume, provisioned concurrency, and Redis node size.
 - Reassess DynamoDB on-demand versus provisioned capacity after stable traffic exists.
 
 ## Sustainability

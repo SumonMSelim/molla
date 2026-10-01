@@ -19,14 +19,6 @@ variable "table_names" {
   type = map(string)
 }
 
-variable "stream_arn" {
-  type = string
-}
-
-variable "stream_name" {
-  type = string
-}
-
 variable "vpc_cidr" {
   type    = string
   default = "10.40.0.0/16"

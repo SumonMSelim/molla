@@ -93,8 +93,8 @@ resource "aws_iam_role_policy" "redirect" {
       },
       {
         Effect   = "Allow"
-        Action   = ["kinesis:PutRecord"]
-        Resource = var.stream_arn
+        Action   = ["dynamodb:PutItem"]
+        Resource = var.table_arns["clicks"]
       },
       {
         Effect = "Allow"
