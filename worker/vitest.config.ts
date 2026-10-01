@@ -15,6 +15,7 @@ export default defineConfig(async () => {
     ],
     test: {
       setupFiles: ['./test/apply-migrations.ts'],
+      coverage: { provider: 'istanbul', include: ['src/**'], reporter: ['text-summary', 'lcov'] },
     },
   }
 })

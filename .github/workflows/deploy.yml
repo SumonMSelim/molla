@@ -31,9 +31,11 @@ jobs:
     timeout-minutes: 20
     environment: production
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: "24"
           cache: npm
@@ -41,7 +43,7 @@ jobs:
             web/package-lock.json
             worker/package-lock.json
 
-      - uses: hashicorp/setup-terraform@v4
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
         with:
           terraform_version: "1.16.2"
 
@@ -72,12 +74,17 @@ jobs:
       - name: Build web app into worker assets
         run: make assets NPM=npm VITE_APP_VERSION="${{ github.ref_type == 'tag' && github.ref_name || github.sha }}"
 
+      # Dependencies install in their own step so package install scripts never
+      # see the Cloudflare API token.
+      - name: Install worker dependencies
+        working-directory: worker
+        run: npm ci
+
       - name: Apply D1 migrations and deploy worker
         working-directory: worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          npm ci
           npx wrangler d1 migrations apply molla-prod --env prod --remote
           npx wrangler deploy --env prod

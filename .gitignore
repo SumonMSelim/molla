@@ -31,3 +31,5 @@ worker/worker-configuration.d.ts
 *_override.tf
 *.auto.tfvars
 tfplan
+
+coverage/
