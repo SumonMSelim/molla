@@ -38,6 +38,6 @@ variable "manage_apex" {
 
 variable "access_hostnames" {
   type        = list(string)
-  description = "Hostnames whose /admin/ path the Access application protects. Defaults to the domain; add a staging host to test takedown there."
+  description = "Hostnames whose /admin/ path the Access application protects. Defaults to the domain."
   default     = []
 }
