@@ -27,5 +27,17 @@ variable "operator_emails" {
 
 variable "name_prefix" {
   type    = string
-  default = "molla"
+  default = "molla-prod"
+}
+
+variable "manage_apex" {
+  type        = bool
+  description = "Create the proxied apex placeholder record. False while the apex still points at the previous deployment."
+  default     = true
+}
+
+variable "access_hostnames" {
+  type        = list(string)
+  description = "Hostnames whose /admin/ path the Access application protects. Defaults to the domain; add a staging host to test takedown there."
+  default     = []
 }

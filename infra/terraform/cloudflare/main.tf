@@ -4,12 +4,14 @@
 # zone needs around it: DNS, firewall rules, headers, and operator access.
 
 locals {
-  takedown_path = "/admin/"
+  takedown_path    = "/admin/"
+  access_hostnames = length(var.access_hostnames) == 0 ? [var.domain_name] : var.access_hostnames
 }
 
 # A proxied placeholder record is required for the Worker route to receive
 # traffic; the Worker answers every request so the target never serves.
 resource "cloudflare_dns_record" "apex" {
+  count   = var.manage_apex ? 1 : 0
   zone_id = var.zone_id
   name    = var.domain_name
   type    = "AAAA"
@@ -41,6 +43,15 @@ resource "cloudflare_page_rule" "www_redirect" {
       status_code = 301
     }
   }
+}
+
+# Respect the Worker's own Cache-Control. The zone default (4 hours)
+# overwrites the redirect's max-age=5, which would let browsers keep serving
+# a taken-down link for hours.
+resource "cloudflare_zone_setting" "browser_cache_ttl" {
+  zone_id    = var.zone_id
+  setting_id = "browser_cache_ttl"
+  value      = 0
 }
 
 # The preload list requires a max-age of at least one year.
@@ -151,9 +162,9 @@ resource "cloudflare_zero_trust_access_application" "takedown" {
   name             = "${var.name_prefix}-takedown"
   type             = "self_hosted"
   session_duration = "1h"
-  destinations = [{
+  destinations = [for host in local.access_hostnames : {
     type = "public"
-    uri  = "${var.domain_name}${local.takedown_path}"
+    uri  = "${host}${local.takedown_path}"
   }]
   policies = concat(
     [{ id = cloudflare_zero_trust_access_policy.service_token.id, precedence = 1 }],

@@ -27,7 +27,26 @@
       { "name": "CREATE_LIMITER", "type": "ratelimit", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }
     ]
   },
+  "account_id": "7aed92ced712cd6a4ada37b330570c50",
   "env": {
+    // Staging answers on cf.mol.la only; mol.la keeps serving whatever the
+    // zone's apex points at until the production route is deployed.
+    "staging": {
+      "routes": [{ "pattern": "cf.mol.la/*", "zone_name": "mol.la" }],
+      "vars": {
+        "PUBLIC_BASE": "https://cf.mol.la",
+        "ACCESS_TEAM_DOMAIN": "",
+        "ACCESS_AUD": ""
+      },
+      "d1_databases": [
+        { "binding": "DB", "database_name": "molla-staging", "database_id": "53876949-ee2b-4850-b5c5-666e139f9cc8", "migrations_dir": "migrations" }
+      ],
+      "unsafe": {
+        "bindings": [
+          { "name": "CREATE_LIMITER", "type": "ratelimit", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }
+        ]
+      }
+    },
     "prod": {
       "routes": [{ "pattern": "mol.la/*", "zone_name": "mol.la" }],
       "vars": {

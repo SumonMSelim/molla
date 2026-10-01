@@ -1,0 +1,5 @@
+# Copy to backend_override.tf (gitignored) to use local state while
+# bootstrapping, then `terraform init -migrate-state` to the R2 backend.
+terraform {
+  backend "local" {}
+}

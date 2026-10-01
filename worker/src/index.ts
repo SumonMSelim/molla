@@ -115,8 +115,10 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
 
 // Static assets are served before the Worker runs when the path matches a
 // file; everything else under /app (deep links, "/") gets the SPA shell.
+// The assets layer 307s "/app/index.html" to "/app/", so ask for the
+// directory form directly.
 async function spa(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url)
-  url.pathname = '/app/index.html'
+  url.pathname = '/app/'
   return env.ASSETS.fetch(new Request(url.toString(), request))
 }

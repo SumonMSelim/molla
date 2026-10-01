@@ -96,6 +96,7 @@ describe('redirect + stats', () => {
     expect(r1.headers.get('Cache-Control')).toBe('public, max-age=5')
     const r2 = await call('/abc1234')
     expect(r2.status).toBe(302)
+    expect(r2.headers.get('Cache-Control')).toBe('public, max-age=5')
 
     const stats = await call('/api/v1/links/abc1234/stats')
     expect(stats.status).toBe(200)

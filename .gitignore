@@ -26,3 +26,7 @@ worker/worker-configuration.d.ts
 .DS_Store
 .idea/
 .vscode/
+
+# Terraform local-state override (bootstrap only)
+*_override.tf
+*.auto.tfvars

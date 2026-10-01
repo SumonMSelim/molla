@@ -32,7 +32,10 @@ export async function redirect(
     if (cached.status === 302) {
       ctx.waitUntil(countClick(deps.stats, code, now))
     }
-    return cached
+    // Hand the browser the short TTL only; s-maxage is for the edge copy.
+    const out = new Response(null, cached)
+    out.headers.set('Cache-Control', BROWSER_CACHE)
+    return out
   }
 
   let response: Response
