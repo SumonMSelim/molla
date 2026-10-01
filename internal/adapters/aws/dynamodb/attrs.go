@@ -18,6 +18,7 @@ const (
 	tableCounters    = "Counters"
 	tableIdempotency = "Idempotency"
 	tableCredentials = "Credentials"
+	tableClicks      = "Clicks"
 	defaultRegion    = "us-east-1"
 	defaultBlockSize = int64(1000)
 	attrShortCode    = "short_code"

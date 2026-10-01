@@ -35,7 +35,7 @@ variable "artifact_dir" {
 
 variable "budget_limit" {
   type        = string
-  description = "Monthly USD budget. Alarms at 80% via alarm_email. Sized for hobby/learning scale (single-AZ ElastiCache + Kinesis interface endpoint are the only real fixed costs; everything else is pay-per-use), not production load."
+  description = "Monthly USD budget. Alarms at 80% via alarm_email. Sized for hobby/learning scale (single-node ElastiCache is the only real fixed cost; everything else is pay-per-use), not production load."
   default     = "25"
 }
 

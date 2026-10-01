@@ -16,13 +16,11 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	awskinesis "github.com/aws/aws-sdk-go-v2/service/kinesis"
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 	goredis "github.com/redis/go-redis/v9"
 
 	awsadapter "github.com/SumonMSelim/molla/internal/adapters/aws"
 	ddb "github.com/SumonMSelim/molla/internal/adapters/aws/dynamodb"
-	"github.com/SumonMSelim/molla/internal/adapters/aws/kinesis"
 	"github.com/SumonMSelim/molla/internal/adapters/logging"
 	redisadapter "github.com/SumonMSelim/molla/internal/adapters/redis"
 	"github.com/SumonMSelim/molla/internal/handlers"
@@ -41,21 +39,19 @@ func newHandler() (http.Handler, error) {
 	if addr == "" {
 		return nil, errors.New("MOLLA_REDIS_ADDR required")
 	}
-	stream := os.Getenv("MOLLA_CLICK_STREAM")
-	if stream == "" {
-		return nil, errors.New("MOLLA_CLICK_STREAM required")
+	if os.Getenv("MOLLA_CLICKS_TABLE") == "" {
+		return nil, errors.New("MOLLA_CLICKS_TABLE required")
 	}
 	cfg, err := awsadapter.RuntimeConfig(context.Background())
 	if err != nil {
 		return nil, err
 	}
 	ddbClient := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) { o.Retryer = awsadapter.Retryer() })
-	kinesisClient := awskinesis.NewFromConfig(cfg, func(o *awskinesis.Options) { o.Retryer = awsadapter.Retryer() })
 	cache := redisadapter.NewCache(goredis.NewClient(redisadapter.OptionsFromEnv(addr)))
 	return handlers.NewRedirect(handlers.RedirectDeps{
 		Store:      ddb.NewLinkStore(ddbClient),
 		Cache:      cache,
-		Publisher:  kinesis.NewPublisher(kinesisClient, stream),
+		Publisher:  ddb.NewClickStore(ddbClient),
 		Clock:      liveClock{},
 		PrivacyKey: []byte(key),
 	}), nil

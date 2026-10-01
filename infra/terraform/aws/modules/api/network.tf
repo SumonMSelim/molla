@@ -47,18 +47,6 @@ resource "aws_security_group" "redis" {
   tags = var.tags
 }
 
-resource "aws_security_group" "vpce" {
-  name   = "${var.name_prefix}-vpce"
-  vpc_id = aws_vpc.this.id
-  ingress {
-    from_port       = 443
-    to_port         = 443
-    protocol        = "tcp"
-    security_groups = [aws_security_group.lambda.id]
-  }
-  tags = var.tags
-}
-
 resource "aws_vpc_endpoint" "dynamodb" {
   vpc_id            = aws_vpc.this.id
   service_name      = "com.amazonaws.${data.aws_region.current.region}.dynamodb"
@@ -67,20 +55,6 @@ resource "aws_vpc_endpoint" "dynamodb" {
   tags              = var.tags
 }
 
-resource "aws_vpc_endpoint" "kinesis" {
-  vpc_id            = aws_vpc.this.id
-  service_name      = "com.amazonaws.${data.aws_region.current.region}.kinesis-streams"
-  vpc_endpoint_type = "Interface"
-  # One AZ, not both: an Interface endpoint bills per AZ-hour, and this
-  # halves that cost at hobby scale. Less redundant (the endpoint is
-  # unavailable if this single AZ has an issue, in which case click
-  # publishing fails and is logged, not the redirect itself); revisit if
-  # real traffic or availability needs justify the second AZ.
-  subnet_ids          = [aws_subnet.private[0].id]
-  security_group_ids  = [aws_security_group.vpce.id]
-  private_dns_enabled = true
-  tags                = var.tags
-}
 
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.this.id

@@ -20,15 +20,26 @@ locals {
       hash_key = "token_hash"
       ttl      = null
     }
+    # Raw click events, one item per redirect. The stream feeds the aggregate
+    # Lambda; TTL is the 90-day raw-event retention. Written through the free
+    # DynamoDB gateway endpoint, which is why there is no Kinesis and no
+    # interface endpoint.
+    clicks = {
+      hash_key = "event_id"
+      ttl      = "ttl"
+      stream   = true
+    }
   }
 }
 
 resource "aws_dynamodb_table" "this" {
   for_each = local.tables
 
-  name         = "${var.name_prefix}-${each.key}"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = each.value.hash_key
+  name             = "${var.name_prefix}-${each.key}"
+  billing_mode     = "PAY_PER_REQUEST"
+  hash_key         = each.value.hash_key
+  stream_enabled   = lookup(each.value, "stream", false)
+  stream_view_type = lookup(each.value, "stream", false) ? "NEW_IMAGE" : null
 
   attribute {
     name = each.value.hash_key

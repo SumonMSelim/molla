@@ -82,7 +82,7 @@ resource "aws_iam_role" "plan" {
 
 # AWS-managed, read-only: terraform plan touches every resource type the
 # workload manages (VPC, DynamoDB, ElastiCache, Lambda, API Gateway,
-# CloudFront, WAF-adjacent, KMS, S3, Kinesis, IAM, SSM, budgets, Cost
+# CloudFront, WAF-adjacent, KMS, S3, IAM, SSM, budgets, Cost
 # Explorer...). Hand-scoping read-only Describe/List/Get permissions across
 # that surface is easy to get subtly wrong -- ReadOnlyAccess is the standard,
 # safe choice for a plan-only role that can never mutate anything.

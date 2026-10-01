@@ -30,14 +30,14 @@ module "data" {
 }
 
 module "analytics" {
-  source           = "../../modules/analytics"
-  name_prefix      = local.name_prefix
-  kms_key_arn      = aws_kms_key.this.arn
-  artifact_dir     = var.artifact_dir
-  stats_table_arn  = module.data.table_arns["stats"]
-  stats_table_name = module.data.stats_table_name
-  shard_count      = 1
-  tags             = local.tags
+  source            = "../../modules/analytics"
+  name_prefix       = local.name_prefix
+  kms_key_arn       = aws_kms_key.this.arn
+  artifact_dir      = var.artifact_dir
+  stats_table_arn   = module.data.table_arns["stats"]
+  stats_table_name  = module.data.stats_table_name
+  clicks_stream_arn = module.data.clicks_stream_arn
+  tags              = local.tags
 }
 
 module "api" {
@@ -47,8 +47,6 @@ module "api" {
   artifact_dir         = var.artifact_dir
   table_arns           = module.data.table_arns
   table_names          = module.data.table_names
-  stream_arn           = module.analytics.stream_arn
-  stream_name          = module.analytics.stream_name
   redis_node_type      = "cache.t4g.micro"
   redis_auth_token     = var.redis_auth_token
   permutation_key      = var.permutation_key

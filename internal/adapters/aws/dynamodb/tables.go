@@ -28,3 +28,7 @@ func countersTable() string {
 func credentialsTable() string {
 	return envOr("MOLLA_CREDENTIALS_TABLE", tableCredentials)
 }
+
+func clicksTable() string {
+	return envOr("MOLLA_CLICKS_TABLE", tableClicks)
+}

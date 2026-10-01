@@ -83,7 +83,7 @@ PITR is on in prod (`enable_pitr`). Restore a table to a new name, verify item c
 
 Single-region launch. CloudFront may still serve cached 302s until TTL. Writes and uncached redirects fail with the region.
 
-- Page: origin 5xx, Lambda errors, DynamoDB user errors, Redis CPU/evictions, Kinesis iterator age.
+- Page: origin 5xx, Lambda errors, DynamoDB user errors, Redis CPU/evictions, aggregate Lambda iterator age.
 - Failover is a **new region deploy**, not automatic. Restore PITR into the surviving region only as a documented emergency; permutation/privacy keys and DNS cutover are required.
 - Do not claim multi-region RTO until a second region exists.
 - Cloudflare outage: DNS and proxy fail together; there is no direct path to CloudFront by design.

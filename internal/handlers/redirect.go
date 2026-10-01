@@ -20,8 +20,8 @@ import (
 const (
 	cacheFreshTTL   = 24 * time.Hour
 	cacheStaleGrace = 15 * time.Minute
-	// publishTimeout bounds the click publish. A warm Kinesis call through
-	// the VPC endpoint takes ~20ms; a cold container's first call (TLS
+	// publishTimeout bounds the click publish. A warm DynamoDB PutItem through
+	// the gateway endpoint takes ~20ms; a cold container's first call (TLS
 	// handshake included) was observed exceeding 100ms, dropping the click
 	// and logging an error. 500ms only ever costs that first request.
 	publishTimeout = 500 * time.Millisecond
