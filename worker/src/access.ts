@@ -24,10 +24,12 @@ export class AccessVerifier {
   private keys: Map<string, CryptoKey> | null = null
   private fetchedAt = 0
 
+  // The global fetch must not be called with the verifier as `this`
+  // (workerd raises "Illegal invocation"), so the default is a wrapper.
   constructor(
     private readonly teamDomain: string,
     private readonly aud: string,
-    private readonly fetchImpl: typeof fetch = fetch,
+    private readonly fetchImpl: typeof fetch = (input, init) => fetch(input, init),
   ) {}
 
   async verify(request: Request, nowSeconds: number): Promise<Principal | null> {

@@ -35,8 +35,8 @@
       "routes": [{ "pattern": "cf.mol.la/*", "zone_name": "mol.la" }],
       "vars": {
         "PUBLIC_BASE": "https://cf.mol.la",
-        "ACCESS_TEAM_DOMAIN": "",
-        "ACCESS_AUD": ""
+        "ACCESS_TEAM_DOMAIN": "sumonmselim.cloudflareaccess.com",
+        "ACCESS_AUD": "9f0835daf7120ff387ec6964f592a9181924800f897f3c6792f5be0446534ccd"
       },
       "d1_databases": [
         { "binding": "DB", "database_name": "molla-staging", "database_id": "53876949-ee2b-4850-b5c5-666e139f9cc8", "migrations_dir": "migrations" }
@@ -51,8 +51,8 @@
       "routes": [{ "pattern": "mol.la/*", "zone_name": "mol.la" }],
       "vars": {
         "PUBLIC_BASE": "https://mol.la",
-        "ACCESS_TEAM_DOMAIN": "REPLACE.cloudflareaccess.com",
-        "ACCESS_AUD": "REPLACE"
+        "ACCESS_TEAM_DOMAIN": "sumonmselim.cloudflareaccess.com",
+        "ACCESS_AUD": "9f0835daf7120ff387ec6964f592a9181924800f897f3c6792f5be0446534ccd"
       },
       "d1_databases": [
         { "binding": "DB", "database_name": "molla-prod", "database_id": "REPLACE", "migrations_dir": "migrations" }

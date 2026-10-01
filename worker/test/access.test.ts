@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AccessVerifier } from '../src/access'
 
 const TEAM = 'team.cloudflareaccess.com'
@@ -18,6 +18,7 @@ async function signer() {
   const exported = (await crypto.subtle.exportKey('jwk', pair.publicKey)) as JsonWebKey
   const { key_ops: _ops, ...jwk } = { ...exported, kid: 'k1' }
   const certs: typeof fetch = async () => Response.json({ keys: [jwk] })
+  const jwks = { keys: [jwk] }
   const sign = async (claims: Record<string, unknown>, kid = 'k1') => {
     const head = b64url(JSON.stringify({ alg: 'RS256', kid }))
     const body = b64url(JSON.stringify(claims))
@@ -26,7 +27,7 @@ async function signer() {
     )
     return `${head}.${body}.${b64url(sig)}`
   }
-  return { certs, sign }
+  return { certs, sign, jwks }
 }
 
 function request(token?: string): Request {
@@ -40,6 +41,20 @@ const NOW = 1_700_000_000
 const good = { aud: [AUD], iss: `https://${TEAM}`, exp: NOW + 60, nbf: NOW - 60, email: 'ops@example.com' }
 
 describe('AccessVerifier', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('fetches the team certs through the global fetch by default', async () => {
+    const { sign, jwks } = await signer()
+    const stub = vi.fn(async (input: RequestInfo | URL) => {
+      expect(String(input)).toBe(`https://${TEAM}/cdn-cgi/access/certs`)
+      return Response.json(jwks)
+    })
+    vi.stubGlobal('fetch', stub)
+    const v = new AccessVerifier(TEAM, AUD)
+    expect((await v.verify(request(await sign(good)), NOW))?.actorID).toBe('ops@example.com')
+    expect(stub).toHaveBeenCalledTimes(1)
+  })
+
   it('accepts a valid assertion and returns the operator principal', async () => {
     const { certs, sign } = await signer()
     const v = new AccessVerifier(TEAM, AUD, certs)
