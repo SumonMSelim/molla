@@ -55,7 +55,7 @@
         "ACCESS_AUD": "9f0835daf7120ff387ec6964f592a9181924800f897f3c6792f5be0446534ccd"
       },
       "d1_databases": [
-        { "binding": "DB", "database_name": "molla-prod", "database_id": "REPLACE", "migrations_dir": "migrations" }
+        { "binding": "DB", "database_name": "molla-prod", "database_id": "90af33de-ce8a-4822-a8a7-7d6b6c8197d6", "migrations_dir": "migrations" }
       ],
       "unsafe": {
         "bindings": [

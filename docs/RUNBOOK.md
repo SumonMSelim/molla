@@ -61,9 +61,9 @@ There is no load-test suite: any sustained run burns the daily quota.
    npx wrangler secret put CF_ZONE_ID --env prod        # optional: global purge on takedown
    npx wrangler secret put CF_PURGE_TOKEN --env prod    # optional: token with Cache Purge only
    ```
-   If migrating from the AWS deployment, `PERMUTATION_KEY` must be the same
-   value as the SSM parameter there, or existing codes stop resolving to the
-   same IDs (they still redirect; only new codes would collide with old ones).
+   A fresh key is fine even when importing links from the AWS deployment:
+   stored codes redirect regardless of key, and a new ID that happens to
+   permute onto an old code is caught by the uniqueness check and retried.
 7. `make worker-deploy` (applies migrations, deploys to the `mol.la/*` route).
 8. Confirm `GET https://mol.la/app/`, `POST /api/v1/links`, a 302 on the new
    code, and a 401 on `POST /admin/v1/links/x/takedown` without Access.
