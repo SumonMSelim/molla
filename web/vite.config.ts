@@ -11,7 +11,7 @@ function devCsp() {
         return html
       }
       return html.replace(
-        /content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self';/,
+        /content="default-src 'self'; script-src 'self' https:\/\/static.cloudflareinsights.com; style-src 'self'; connect-src 'self' https:\/\/cloudflareinsights.com;/,
         "content=\"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:;",
       )
     },
