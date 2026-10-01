@@ -8,10 +8,12 @@
     "deploy": "wrangler deploy --env prod",
     "lint": "wrangler types && oxlint src test && tsc --noEmit",
     "test": "vitest run",
+    "coverage": "vitest run --coverage",
     "types": "wrangler types"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.22.0",
+    "@vitest/coverage-istanbul": "4.1.11",
     "oxlint": "1.86.0",
     "typescript": "5.9.3",
     "vitest": "4.1.11",
