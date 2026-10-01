@@ -1,12 +1,13 @@
 name: Deploy
 
 # Applies infra/terraform/aws/envs/prod and ships Lambda + web artifacts.
-# Never runs on a merge to main: only a v* tag push (publishing a release) or
-# a manual dispatch run on a v* tag. The production environment accepts only
+# Never runs on a merge: only an aws-v* tag push (publishing a release) or
+# a manual dispatch run on an aws-v* tag. Plain v* tags deploy the
+# Cloudflare implementation on the main branch. The production environment accepts only
 # v*.*.* tags and has no required reviewer, so a release deploys immediately.
 on:
   push:
-    tags: ["v*.*.*"]
+    tags: ["aws-v*.*.*"]
   workflow_dispatch:
     inputs:
       confirm:

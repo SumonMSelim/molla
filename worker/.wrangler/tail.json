@@ -1,0 +1,123 @@
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProcessing wrangler.jsonc configuration:[0m
+
+    - "unsafe" fields are experimental and may change or break at any time.
+
+
+{
+    "wallTime": 1,
+    "cpuTime": 0,
+    "truncated": false,
+    "executionModel": "stateless",
+    "outcome": "ok",
+    "scriptTags": [
+        "cf:service=molla",
+        "cf:environment=staging"
+    ],
+    "scriptVersion": {
+        "id": "6f6155bf-df62-4614-86c1-e0a2c0a44ed5"
+    },
+    "scriptName": "molla-staging",
+    "diagnosticsChannelEvents": [],
+    "exceptions": [],
+    "logs": [
+        {
+            "message": [
+                "access verification failed",
+                {
+                    "error": "TypeError: Illegal invocation: function called with incorrect `this` reference. See https://developers.cloudflare.com/workers/observability/errors/#illegal-invocation-errors for details."
+                }
+            ],
+            "level": "error",
+            "timestamp": 1790843865553
+        }
+    ],
+    "eventTimestamp": 1790843865552,
+    "event": {
+        "request": {
+            "url": "https://cf.mol.la/admin/v1/links/smoke-1/takedown",
+            "method": "POST",
+            "headers": {
+                "accept": "*/*",
+                "accept-encoding": "gzip, br",
+                "cf-access-jwt-assertion": "REDACTED",
+                "cf-connecting-ip": "145.109.24.104",
+                "cf-ipcountry": "NL",
+                "cf-ray": "a43a25af88663466",
+                "cf-visitor": "{\"scheme\":\"https\"}",
+                "connection": "Keep-Alive",
+                "content-length": "18",
+                "content-type": "application/json",
+                "cookie": "REDACTED",
+                "host": "cf.mol.la",
+                "user-agent": "curl/8.7.1",
+                "x-forwarded-proto": "https",
+                "x-origin-verify": "HLuierhZBkUeovzZtlVaLZGb8gNdYCLu",
+                "x-real-ip": "145.109.24.104"
+            },
+            "cf": {
+                "httpProtocol": "HTTP/2",
+                "requestPriority": "weight=16;exclusive=0;group=0;group-weight=0",
+                "edgeRequestKeepAliveStatus": 1,
+                "requestHeaderNames": {},
+                "clientTcpRtt": 4,
+                "clientQuicRtt": 0,
+                "colo": "AMS",
+                "asn": 1124,
+                "asOrganization": "Universiteit van Amsterdam",
+                "country": "NL",
+                "isEUCountry": "1",
+                "city": "Amsterdam",
+                "continent": "EU",
+                "region": "North Holland",
+                "regionCode": "NH",
+                "timezone": "Europe/Amsterdam",
+                "longitude": "4.88969",
+                "latitude": "52.37403",
+                "postalCode": "1012",
+                "tlsVersion": "TLSv1.3",
+                "tlsCipher": "AEAD-CHACHA20-POLY1305-SHA256",
+                "tlsClientRandom": "Mw6yxQgXdjKBepl+KVOd/SXjk3kAM7cMWbO/G1o4qSM=",
+                "tlsClientCiphersSha1": "eDGmD1H99AwNYzOR+7eoGLo6eLU=",
+                "tlsClientExtensionsSha1": "Ub+nUmIm1U57hdNSUph0R+kx9Gc=",
+                "tlsClientExtensionsSha1Le": "NMNf2YIpLBhtroOEBooGFi+jtJ8=",
+                "tlsExportedAuthenticator": {
+                    "clientHandshake": "d960e0b8f1333f54b496a1e10f0f3de63003703b1f35da39f6aaa0a3866f9fc1",
+                    "serverHandshake": "03c635b23ce732803e8770afd3741b5197ebb04f9399edae3606885212095f15",
+                    "clientFinished": "ddd009d31b5cf1c07854dc23a414a80c84112497a3fbb2053eadfc3bbb288f4f",
+                    "serverFinished": "e1f435328fca74f1399b7bae8c1aef25e9528148f9bb02af217ec7bd78e5e23e"
+                },
+                "tlsClientHelloLength": "310",
+                "tlsClientAuth": {
+                    "certPresented": "0",
+                    "certVerified": "NONE",
+                    "certRevoked": "0",
+                    "certIssuerDN": "",
+                    "certSubjectDN": "",
+                    "certIssuerDNRFC2253": "",
+                    "certSubjectDNRFC2253": "",
+                    "certIssuerDNLegacy": "",
+                    "certSubjectDNLegacy": "",
+                    "certSerial": "",
+                    "certIssuerSerial": "",
+                    "certSKI": "",
+                    "certIssuerSKI": "",
+                    "certFingerprintSHA1": "",
+                    "certFingerprintSHA256": "",
+                    "certNotBefore": "",
+                    "certNotAfter": "",
+                    "certRFC9440": "",
+                    "certRFC9440TooLarge": false,
+                    "certChainRFC9440": "",
+                    "certChainRFC9440TooLarge": false
+                },
+                "verifiedBotCategory": "",
+                "edgeL4": {
+                    "deliveryRate": 971387
+                }
+            }
+        },
+        "response": {
+            "status": 503
+        }
+    }
+}

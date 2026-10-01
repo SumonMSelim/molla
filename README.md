@@ -9,6 +9,10 @@
 
 **A scalable, reliable, and secure URL shortener.**
 
+> This is the AWS implementation (Go, Lambda, DynamoDB, CloudFront), kept
+> for reference on the `aws` branch. The live service runs the Cloudflare
+> implementation on `main`.
+
 molla is an open-source URL-shortening service written in Go, with AWS as its first deployment target. It is designed around a small provider-neutral core, low-latency redirects, durable link storage, asynchronous analytics, and explicit security boundaries.
 
 ## Requirements
