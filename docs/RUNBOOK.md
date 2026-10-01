@@ -61,8 +61,7 @@ There is no load-test suite: any sustained run burns the daily quota.
    npx wrangler secret put CF_ZONE_ID --env prod        # optional: global purge on takedown
    npx wrangler secret put CF_PURGE_TOKEN --env prod    # optional: token with Cache Purge only
    ```
-   A fresh key is fine even when importing links from the AWS deployment:
-   stored codes redirect regardless of key, and a new ID that happens to
+   Stored codes redirect regardless of key, and a new ID that happens to
    permute onto an old code is caught by the uniqueness check and retried.
 7. `make worker-deploy` (applies migrations, deploys to the `mol.la/*` route).
 8. Confirm `GET https://mol.la/app/`, `POST /api/v1/links`, a 302 on the new
@@ -132,15 +131,6 @@ npx wrangler d1 time-travel restore molla-prod --env prod --timestamp=2026-10-01
 
 Restore is in place and immediate; take a bookmark first
 (`d1 time-travel info`) so you can roll forward again.
-
-## Migrating link data from the AWS deployment
-
-1. Export: `aws dynamodb scan --table-name molla-prod-links --output json > links.json`
-   and the same for `molla-prod-stats` and `molla-prod-counters`.
-2. `node worker/scripts/dynamodb-to-d1.mjs links.json stats.json counters.json > import.sql`
-   writes INSERT statements plus a counter seed above the highest leased ID.
-3. `npx wrangler d1 execute molla-prod --env prod --remote --file import.sql`.
-4. Spot-check a few codes with `GET /{code}` and `/stats`.
 
 ## Regenerating the golden test vectors
 
