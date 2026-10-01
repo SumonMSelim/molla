@@ -29,12 +29,14 @@ There is no load-test suite: any sustained run burns the daily quota.
 
 ## Deploy (first time, by hand -- bootstraps GitHub Actions)
 
-1. **API token** (My Profile → API Tokens). Scopes on the mol.la zone:
-   Zone:DNS:Edit, Zone Settings:Edit, Zone WAF:Edit, Page Rules:Edit,
-   Bot Management:Edit, Transform Rules:Edit, Cache Purge:Purge. Account
-   scopes: Workers Scripts:Edit, D1:Edit, Access: Apps and Policies:Edit,
-   Access: Service Tokens:Edit. Export as `CLOUDFLARE_API_TOKEN`; export
-   `CLOUDFLARE_ACCOUNT_ID` too.
+1. **API token**, an account-owned token (Manage Account → Account API
+   Tokens) with two policies. Entire account: Workers Scripts:Edit, D1:Edit,
+   Access: Apps and Policies:Edit, Access: Service Tokens:Edit, Account
+   Settings:Read. Zone mol.la only: Zone:Read, DNS:Edit, Zone Settings:Edit,
+   Zone WAF:Edit, Bot Management:Edit, Transform Rules:Edit, Dynamic URL
+   Redirects:Edit, Workers Routes:Edit, Cache Purge:Purge. Export as
+   `CLOUDFLARE_API_TOKEN`; export `CLOUDFLARE_ACCOUNT_ID` too. Page Rules
+   are not used because that API rejects account-owned tokens.
 2. **State bucket**: create an R2 bucket (e.g. `molla-tfstate`) and an R2
    API token (Object Read & Write on that bucket). Export its key pair as
    `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`; the S3-compatible backend
@@ -76,8 +78,11 @@ There is no load-test suite: any sustained run burns the daily quota.
    `CLOUDFLARE_ZONE_ID`, `DOMAIN_NAME` (`mol.la`), `ACCESS_TEAM_NAME`,
    `OPERATOR_EMAILS` (HCL list syntax, e.g. `["you@example.com"]`),
    `TF_STATE_BUCKET`.
-3. Environment **secrets** on both: `CLOUDFLARE_API_TOKEN` (`production-plan`
-   can use a read-only variant), `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`.
+3. Environment **secrets** on both: `CLOUDFLARE_API_TOKEN`, `R2_ACCESS_KEY_ID`,
+   `R2_SECRET_ACCESS_KEY`. `production` holds the write-scoped token and the
+   R2 Object Read & Write key. `production-plan` runs on PRs, so it holds a
+   read-only token (Read on the same permission groups) and an R2 Object Read
+   only key scoped to the state bucket.
 4. Deploy by pushing a `vX.Y.Z` tag or running `deploy.yml` manually (type
    `deploy` to confirm). A plain merge to `main` never deploys.
 

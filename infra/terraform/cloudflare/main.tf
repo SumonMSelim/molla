@@ -29,20 +29,28 @@ resource "cloudflare_dns_record" "www" {
   proxied = true
 }
 
-# Single Redirects need a token permission the zone token does not grant; a
-# Page Rule achieves the same 301 with the Page Rules permission it has.
-resource "cloudflare_page_rule" "www_redirect" {
-  zone_id  = var.zone_id
-  target   = "www.${var.domain_name}/*"
-  priority = 1
-  status   = "active"
-
-  actions = {
-    forwarding_url = {
-      url         = "https://${var.domain_name}/$1"
-      status_code = 301
+# www redirects to the apex with a Single Redirect rule. The legacy Page Rules
+# API rejects account-owned API tokens, so it is not used.
+resource "cloudflare_ruleset" "www_redirect" {
+  zone_id = var.zone_id
+  name    = "${var.name_prefix}-www-redirect"
+  kind    = "zone"
+  phase   = "http_request_dynamic_redirect"
+  rules = [{
+    description = "Redirect www to the apex"
+    expression  = "(http.host eq \"www.${var.domain_name}\")"
+    enabled     = true
+    action      = "redirect"
+    action_parameters = {
+      from_value = {
+        status_code           = 301
+        preserve_query_string = true
+        target_url = {
+          expression = "concat(\"https://${var.domain_name}\", http.request.uri.path)"
+        }
+      }
     }
-  }
+  }]
 }
 
 # Respect the Worker's own Cache-Control. The zone default (4 hours)
@@ -83,7 +91,9 @@ resource "cloudflare_bot_management" "this" {
 
 # Static assets are served before the Worker runs, so they would otherwise
 # miss the security headers the Worker sets on its own responses. This zone
-# rule stamps the same set on every response, asset or Worker.
+# rule stamps the same set on every response, asset or Worker. It is scoped to
+# this host: the zone also serves other apps whose own headers must not be
+# overridden by this CSP.
 resource "cloudflare_ruleset" "response_headers" {
   zone_id = var.zone_id
   name    = "${var.name_prefix}-response-headers"
@@ -91,7 +101,7 @@ resource "cloudflare_ruleset" "response_headers" {
   phase   = "http_response_headers_transform"
   rules = [{
     description = "Security headers on every response"
-    expression  = "true"
+    expression  = "(http.host eq \"${var.domain_name}\")"
     enabled     = true
     action      = "rewrite"
     action_parameters = {
@@ -119,7 +129,7 @@ resource "cloudflare_ruleset" "api_rate_limit" {
   phase   = "http_ratelimit"
   rules = [{
     description = "Rate-limit public link creation per client IP"
-    expression  = "(http.request.uri.path eq \"/api/v1/links\" and http.request.method eq \"POST\")"
+    expression  = "(http.host eq \"${var.domain_name}\" and http.request.uri.path eq \"/api/v1/links\" and http.request.method eq \"POST\")"
     enabled     = true
     action      = "block"
     ratelimit = {
