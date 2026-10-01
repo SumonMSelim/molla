@@ -1,126 +1,67 @@
-# AWS Well-Architected review
+# Architecture review
 
-This local checklist evaluates molla against the six AWS Well-Architected Framework pillars and the Serverless Applications Lens. It is a design gate, not a claim of AWS certification.
+This local checklist evaluates molla on Cloudflare against the six pillars
+of the AWS Well-Architected Framework, used here as a vendor-neutral rubric.
+It is a design gate, not a certification.
 
 ## Launch review record
 
 | Field | Value |
 | --- | --- |
-| Date | 2026-09-13 |
+| Date | 2026-10-01 |
 | Workload owner | platform |
-| Security reviewer | platform (assign named reviewer before prod apply) |
-| AWS Well-Architected Tool | record workload ID after the first Tool review; not a substitute for this file |
-| Accepted risks | single-region launch; approximate click stats (see below) |
+| Accepted risks | Free-plan hard quota; single D1 primary; approximate click stats (see below) |
 
-Review this file before production launch, after material architecture changes, and at least quarterly while the service is active. Record unresolved high-risk issues in the AWS Well-Architected Tool with an owner and target date. Operator steps: [RUNBOOK.md](RUNBOOK.md).
+Review this file before production launch, after material architecture
+changes, and at least quarterly while the service is active. Operator
+steps: [RUNBOOK.md](RUNBOOK.md).
 
 ## Operational excellence
 
-Aligned design:
-
-- Infrastructure is defined in Terraform; pull requests validate without production credentials.
-- API, redirect, invalidation, and analytics responsibilities are isolated.
-- Application and audit logs are structured and correlated.
-
-Required before production:
-
-- Define workload owner, escalation path, service-level indicators, dashboards, and alarm actions.
-- Add deployment runbooks with reviewed plan, canary or weighted Lambda alias rollout, automatic alarm-based rollback, and rollback verification.
-- Make operational changes small, reversible, and observable.
-- Run game days for Redis failover, DynamoDB throttling, Clicks stream lag, invalidation failure, expired credentials, and restore procedures.
-- Track post-incident actions and feed them back into design and runbooks.
+- Worker, D1 schema, cron, assets, and bindings are declared in `wrangler.jsonc`; zone configuration is Terraform. Pull requests validate without an account.
+- Redirect, API, takedown, and cleanup responsibilities are separate handlers in one Worker.
+- Logs are structured JSON via Workers Logs (3-day retention on the Free plan).
+- Required: Cloudflare Notifications for Worker error rate and usage approaching limits, with a named responder.
 
 ## Security
 
-Aligned design:
-
-- Go authenticates hashed developer credentials and enforces ownership.
-- API and redirect paths have separate roles and scaling controls.
-- Storage, streams, cache traffic, logs, artifacts, and state require encryption.
-- Public redirect traffic is protected by Cloudflare (proxy, WAF, rate limiting) in front of CloudFront, which rejects requests that bypass Cloudflare; API usage plans constrain developers.
-- User destinations are parsed but never fetched synchronously.
-
-Required before production:
-
-- Use separate AWS accounts for production and non-production under AWS Organizations where available.
-- Use short-lived federated operator access with MFA; prohibit long-lived deployment access keys.
-- Enable organization/account CloudTrail, AWS Config, GuardDuty, Security Hub, WAF logging, and actionable findings routing.
-- Enforce least-privilege IAM with Access Analyzer validation and explicit resource scopes.
-- Inventory and rotate developer, Redis, permutation, and privacy-hashing secrets.
-- Test credential revocation, operator takedown, and cache-tombstone propagation.
-- Add dependency, secret, and Terraform security scanning to pull-request CI.
+- Takedown is behind Cloudflare Access and the Worker re-verifies the Access JWT, so a removed policy fails closed.
+- Secrets live in Workers Secrets; nothing secret is in the repository or Terraform state except the Access service token output (sensitive).
+- Security headers are set by the Worker and by a zone rule for static assets; HSTS preload is on.
+- Public create is rate limited at the edge and in the Worker. User destinations are parsed but never fetched.
+- Required: rotate the Access service token yearly (Terraform `duration`); scope the API token to the zone and account as listed in the runbook.
 
 ## Reliability
 
-Aligned design:
-
-- Managed regional services provide Multi-AZ resilience; Redis has automatic failover.
-- Click events are DynamoDB items with a 90-day TTL; DynamoDB Streams feeds the aggregator, so the analytics path has no Kinesis stream, no Firehose, and no interface endpoint to size or pay for.
-- DynamoDB is authoritative; Redis is disposable and cache failures fall back safely.
-- Link creation and idempotency are one DynamoDB transaction.
-- Deletes are durable, versioned, retryable, and report failure until cache invalidation succeeds.
-- DynamoDB PITR and explicit RPO/RTO targets protect durable data.
-
-Required before production:
-
-- Enumerate Lambda concurrency, API Gateway, DynamoDB, VPC ENI, and WAF quotas; maintain at least 20% peak headroom and alarm on consumption.
-- Configure bounded retries with jitter, timeouts shorter than caller budgets, reserved concurrency where isolation is required, and dead-letter/on-failure destinations for asynchronous consumers.
-- Verify partial-batch failure handling for the DynamoDB Streams consumer.
-- Run sustained peak and burst load tests, including cache-cold and dependency-degraded cases.
-- Automate periodic DynamoDB restore tests and verify data integrity plus measured RPO/RTO.
-- Document the accepted regional-outage risk and recovery communication without implying automated regional failover.
+- D1 is authoritative; the edge cache is disposable and cache failures fall back to D1.
+- Link creation and idempotency are one D1 batch (transaction).
+- Deletes are versioned and retryable; cache invalidation failure is reported and audited.
+- D1 Time Travel gives 30-day point-in-time restore with no setup.
+- Accepted: the Free plan's daily quota fails closed; the runbook defines the upgrade trigger.
 
 ## Performance efficiency
 
-Aligned design:
-
-- CloudFront and Redis absorb hot-link reads before DynamoDB.
-- Generated IDs avoid a high-frequency central coordinator.
-- Analytics writes are aggregated away from the redirect path.
-- Go Lambda functions target arm64 and reuse SDK/cache clients across invocations.
-
-Required before production:
-
-- Benchmark code generation, cache serialization, redirect handling, and aggregation.
-- Load-test p50, p95, and p99 latency at expected peak and burst traffic.
-- Tune Lambda memory and provisioned concurrency using measured results and Lambda Power Tuning or Compute Optimizer.
-- Measure CloudFront, Redis, and DynamoDB hit rates; replace design assumptions with production telemetry.
-- Alarm on latency, throttles, errors, concurrency saturation, cache evictions, and aggregate Lambda iterator age.
+- Workers run at every edge location; the Cache API serves hot redirects for 60s per colo without touching D1.
+- Generated IDs come from block leases, so a create costs one D1 write per 100 IDs plus the insert.
+- Click counting runs after the response via `waitUntil`.
 
 ## Cost optimization
 
-Aligned design:
-
-- Serverless and on-demand services avoid idle application capacity at launch.
-- Function URL avoids API Gateway request charges on the redirect path.
-- Data lifecycle policies bound idempotency, logs, analytics, and deleted-link storage.
-- Costly controls such as a second WAF layer are explicit design decisions; Cloudflare provides the firewall.
-
-Required before production:
-
-- Apply mandatory workload, environment, owner, and cost-center tags where supported.
-- Configure AWS Budgets and Cost Anomaly Detection with named responders.
-- Validate estimates with the AWS Pricing Calculator using measured payload sizes and request counts.
-- Review CloudFront price class or flat-rate plans, WAF request charges, Clicks table write volume, log volume, provisioned concurrency, and Redis node size.
-- Reassess DynamoDB on-demand versus provisioned capacity after stable traffic exists.
+- Every service in use has a Free-plan tier: Workers, D1, Cache API, Static Assets, Access, Rate Limiting, Cron Triggers, Workers Logs, R2 (state).
+- No per-service fixed cost; monthly spend is $0 within quota. The upgrade path is Workers Paid at $5/mo.
+- Removed versus the AWS design: cache cluster, provisioned concurrency, KMS, API Gateway, CloudFront, click event stream.
 
 ## Sustainability
 
-Aligned design:
-
-- Managed serverless services and arm64 compute reduce idle infrastructure.
-- Caching and batched analytics reduce repeated compute and storage operations.
-- TTL and lifecycle policies remove expired data.
-
-Required before production:
-
-- Right-size Lambda memory, concurrency, Redis, and stream capacity from measurements.
-- Avoid duplicate telemetry and retain only fields required for operation, security, or product behavior.
-- Prefer efficient serialization and batched network/storage operations.
-- Review utilization quarterly and remove unused environments, alarms, streams, buckets, and retained artifacts.
+- No idle infrastructure; a single Worker bundle under 100 KB.
+- TTL-driven cron purge removes expired replay records and purged links.
 
 ## Accepted risk
 
-The first release has one active AWS region. A regional outage can interrupt writes and redirects after edge entries expire. This prevents claiming regional fault tolerance; it does not waive Multi-AZ design, backup testing, quota management, fault injection, or operational readiness requirements.
+D1 has one primary location. A primary outage interrupts writes and
+uncached redirects; edge-cached redirects continue for up to 60s. There is
+no automated failover.
 
-Click statistics are approximate. Edge-cache hits can undercount and rare at-least-once processing retries can overcount. They are not suitable for billing or contractual reporting without a later reconciliation design.
+Click statistics are approximate. The counter increments after the
+response is sent and is not retried if the isolate is torn down first.
+They are not suitable for billing or contractual reporting.

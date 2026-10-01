@@ -4,15 +4,15 @@ Static SPA for the mol.la JSON API. React, TypeScript, Vite, Tailwind v4. Same v
 
 ## Two-terminal loop
 
-Terminal 1, API with in-memory adapters (Docker):
+Terminal 1, Worker with a local D1 (Docker, wrangler dev):
 
 ```sh
-make dev-api
+make dev
 ```
 
-Listens on `http://127.0.0.1:8080`. Create and stats are unauthenticated. Create returns a `short_url` on the same origin; `GET /{code}` is a 302.
+Listens on `http://127.0.0.1:8787`. Create and stats are unauthenticated. Create returns a `short_url` on the same origin; `GET /{code}` is a 302.
 
-Terminal 2, Vite (proxies `/api` to the Go process):
+Terminal 2, Vite (proxies `/api` to the Worker):
 
 ```sh
 cd web

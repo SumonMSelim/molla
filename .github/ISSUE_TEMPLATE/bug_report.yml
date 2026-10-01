@@ -20,7 +20,7 @@ body:
         - Redirects and caching
         - Storage
         - Analytics
-        - AWS infrastructure and deployment
+        - Cloudflare infrastructure and deployment
         - Local development and tooling
         - Other or unsure
     validations:

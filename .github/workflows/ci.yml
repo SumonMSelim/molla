@@ -14,38 +14,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  go:
+  worker:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-node@v5
         with:
-          go-version: "1.27"
-          cache: false
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            worker/package-lock.json
 
-      - name: Format
-        run: make lint GOFMT=gofmt
+      - name: Build web app into worker assets
+        run: make assets NPM=npm
 
-      - name: Vet
-        run: make vet GO=go
+      - name: Lint and test worker
+        run: make worker-lint NPM_WORKER=npm && cd worker && npm run test
 
-      - name: Build
-        run: make build GO=go
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
 
-      - name: Vulnerability scan
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest && govulncheck ./...
-
-      - name: Test (race and coverage)
-        run: make coverage GO=go
-
-      - name: Upload coverage report
-        uses: codecov/codecov-action@v5
+      - uses: actions/setup-node@v5
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage.out
-          fail_ci_if_error: true
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Lint, test, build
+        run: make web-lint NPM=npm && make web-test NPM=npm && make web-build NPM=npm
 
   terraform:
     runs-on: ubuntu-latest
@@ -63,19 +65,4 @@ jobs:
       - name: Terraform security scan
         uses: aquasecurity/tfsec-action@v1.0.3
         with:
-          working_directory: infra/terraform/aws
-
-  web:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
-      - name: Lint, test, build
-        run: make web-lint NPM=npm && make web-test NPM=npm && make web-build NPM=npm
+          working_directory: infra/terraform/cloudflare

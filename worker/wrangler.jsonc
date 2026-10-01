@@ -1,0 +1,48 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "molla",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-22",
+  "workers_dev": false,
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "none",
+    "html_handling": "auto-trailing-slash"
+  },
+  "triggers": { "crons": ["17 3 * * *"] },
+  "vars": {
+    "PUBLIC_BASE": "http://localhost:8787",
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": ""
+  },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "molla-dev", "database_id": "local", "migrations_dir": "migrations" }
+  ],
+  "unsafe": {
+    "bindings": [
+      // Per-IP ceiling on anonymous link creation; the zone WAF rule is the
+      // coarser outer layer.
+      { "name": "CREATE_LIMITER", "type": "ratelimit", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }
+    ]
+  },
+  "env": {
+    "prod": {
+      "routes": [{ "pattern": "mol.la/*", "zone_name": "mol.la" }],
+      "vars": {
+        "PUBLIC_BASE": "https://mol.la",
+        "ACCESS_TEAM_DOMAIN": "REPLACE.cloudflareaccess.com",
+        "ACCESS_AUD": "REPLACE"
+      },
+      "d1_databases": [
+        { "binding": "DB", "database_name": "molla-prod", "database_id": "REPLACE", "migrations_dir": "migrations" }
+      ],
+      "unsafe": {
+        "bindings": [
+          { "name": "CREATE_LIMITER", "type": "ratelimit", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }
+        ]
+      }
+    }
+  }
+}

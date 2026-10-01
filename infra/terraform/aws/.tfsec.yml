@@ -1,4 +1,0 @@
-minimum_severity: HIGH
-
-exclude:
-  - aws-iam-no-policy-wildcards

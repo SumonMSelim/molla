@@ -1,85 +1,83 @@
 name: Deploy
 
-# Applies infra/terraform/aws/envs/prod and ships Lambda + web artifacts.
-# Never runs on a merge to main: only a v* tag push (publishing a release) or
-# a manual dispatch run on a v* tag. The production environment accepts only
-# v*.*.* tags and has no required reviewer, so a release deploys immediately.
+# Applies infra/terraform/cloudflare, runs D1 migrations, and deploys the
+# Worker with its static assets. Never runs on a merge to main: only a v* tag
+# push (publishing a release) or a manual dispatch run on a v* tag. The
+# production environment accepts only v*.*.* tags and has no required
+# reviewer, so a release deploys immediately.
 on:
   push:
     tags: ["v*.*.*"]
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type "deploy" to confirm applying infra/terraform/aws/envs/prod'
+        description: 'Type "deploy" to confirm deploying to production'
         required: true
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: deploy-production
   cancel-in-progress: false
 
 env:
-  TF_DIR: infra/terraform/aws/envs/prod
+  TF_DIR: infra/terraform/cloudflare
 
 jobs:
   deploy:
     if: github.event_name == 'push' || github.event.inputs.confirm == 'deploy'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     environment: production
     steps:
       - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v7
-        with:
-          go-version: "1.27"
-          cache: false
 
       - uses: actions/setup-node@v5
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: |
+            web/package-lock.json
+            worker/package-lock.json
 
       - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: "1.16.2"
 
-      - uses: aws-actions/configure-aws-credentials@v5
-        with:
-          role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
-
-      - name: Build Lambda zips
-        run: make build-lambda GO=go
-
-      - name: Build web app
-        run: make web-build NPM=npm VITE_APP_VERSION="${{ github.ref_type == 'tag' && github.ref_name || github.sha }}"
-
-      - name: Terraform init
+      - name: Terraform init (R2 backend)
         working-directory: ${{ env.TF_DIR }}
-        run: terraform init -input=false
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="endpoints={s3=\"https://${{ vars.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com\"}"
 
       - name: Terraform apply
         working-directory: ${{ env.TF_DIR }}
         env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           terraform apply -auto-approve -input=false \
-            -var "artifact_dir=${{ github.workspace }}/dist" \
-            -var 'admin_principal_arns=${{ vars.ADMIN_PRINCIPAL_ARNS }}' \
-            -var "alarm_email=${{ vars.ALARM_EMAIL }}" \
+            -var "account_id=${{ vars.CLOUDFLARE_ACCOUNT_ID }}" \
+            -var "zone_id=${{ vars.CLOUDFLARE_ZONE_ID }}" \
             -var "domain_name=${{ vars.DOMAIN_NAME }}" \
-            -var "cloudflare_zone_id=${{ vars.CLOUDFLARE_ZONE_ID }}" \
-            -var "github_repository=${{ github.repository }}"
+            -var "access_team_name=${{ vars.ACCESS_TEAM_NAME }}" \
+            -var 'operator_emails=${{ vars.OPERATOR_EMAILS }}'
 
-      - name: Sync web app and invalidate cache
-        working-directory: ${{ env.TF_DIR }}
+      - name: Build web app into worker assets
+        run: make assets NPM=npm VITE_APP_VERSION="${{ github.ref_type == 'tag' && github.ref_name || github.sha }}"
+
+      - name: Apply D1 migrations and deploy worker
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          UI_BUCKET="$(terraform output -raw ui_bucket)"
-          DIST_ID="$(terraform output -raw distribution_id)"
-          aws s3 sync "${{ github.workspace }}/web/dist" "s3://$UI_BUCKET/app" --delete
-          aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths '/app/*'
+          npm ci
+          npx wrangler d1 migrations apply molla-prod --env prod --remote
+          npx wrangler deploy --env prod

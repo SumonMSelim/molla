@@ -1,0 +1,120 @@
+{
+  "key": "molla-slice-1-fixed-test-key",
+  "vectors": [
+    {
+      "id": 0,
+      "permuted": 3221397749444,
+      "code": "UIiAFaQ"
+    },
+    {
+      "id": 1,
+      "permuted": 3023883318463,
+      "code": "ReHEeU7"
+    },
+    {
+      "id": 2,
+      "permuted": 2662047990469,
+      "code": "KRKa4SN"
+    },
+    {
+      "id": 7,
+      "permuted": 2183467085652,
+      "code": "CrlPncU"
+    },
+    {
+      "id": 42,
+      "permuted": 3095482317599,
+      "code": "SuRalkP"
+    },
+    {
+      "id": 1000,
+      "permuted": 654310531244,
+      "code": "bwcYj7e"
+    },
+    {
+      "id": 1001,
+      "permuted": 2942987583694,
+      "code": "POoXYQu"
+    },
+    {
+      "id": 123456789,
+      "permuted": 197097934784,
+      "code": "3t8KQA8"
+    },
+    {
+      "id": 1048576,
+      "permuted": 1870669431059,
+      "code": "wVV0i9J"
+    },
+    {
+      "id": 1073741824,
+      "permuted": 481356131702,
+      "code": "8tq9gXQ"
+    },
+    {
+      "id": 34359738368,
+      "permuted": 1354508537246,
+      "code": "nQvpMD4"
+    },
+    {
+      "id": 274877906944,
+      "permuted": 2850872567262,
+      "code": "ObR0L70"
+    },
+    {
+      "id": 274877906949,
+      "permuted": 785540773798,
+      "code": "dPs520C"
+    },
+    {
+      "id": 3521614606207,
+      "permuted": 287802822200,
+      "code": "549hjle"
+    },
+    {
+      "id": 3521614606207,
+      "permuted": 287802822200,
+      "code": "549hjle"
+    },
+    {
+      "id": 999999999999,
+      "permuted": 3437636356371,
+      "code": "YwkHOXp"
+    }
+  ],
+  "url_ok": [
+    "https://example.com",
+    "http://example.com/a?b=c#d",
+    "HTTPS://EXAMPLE.COM/x",
+    "https://例え.jp/パス",
+    "https://example.com/a b",
+    "https://[::1]:8080/x"
+  ],
+  "url_bad": [
+    "https://user:pw@example.com",
+    "https://user@example.com",
+    "ftp://example.com",
+    "example.com",
+    "https://",
+    "",
+    "https://example.com/\u0001",
+    "javascript:alert(1)",
+    "https://exa mple.com"
+  ],
+  "alias_ok": [
+    "abc",
+    "apps",
+    "a-b_c",
+    "ABC1234",
+    "abcdefghijklmnopqrstuvwxyzabcdef"
+  ],
+  "alias_bad": [
+    "ab",
+    "api",
+    "app",
+    "abc!",
+    "ééé",
+    "abcdefghijklmnopqrstuvwxyzabcdefg",
+    "ab c"
+  ]
+}

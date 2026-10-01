@@ -28,5 +28,5 @@ Reports are especially useful when they involve:
 - redirects that bypass deletion, expiry, or abuse takedown;
 - injection, request smuggling, cache poisoning, or unsafe URL handling;
 - denial-of-service or rate-limit bypass;
-- AWS IAM, storage, encryption, network, or infrastructure misconfiguration;
+- Cloudflare Worker, D1, Access, or zone configuration weaknesses;
 - dependency or build-pipeline compromise.

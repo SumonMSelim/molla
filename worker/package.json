@@ -1,0 +1,20 @@
+{
+  "name": "molla-worker",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --ip 0.0.0.0",
+    "deploy": "wrangler deploy --env prod",
+    "lint": "wrangler types && oxlint src test && tsc --noEmit",
+    "test": "vitest run",
+    "types": "wrangler types"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.22.0",
+    "oxlint": "1.86.0",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11",
+    "wrangler": "4.145.0"
+  }
+}
