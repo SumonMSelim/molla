@@ -1,6 +1,8 @@
 # molla
 
 [![CI](https://github.com/SumonMSelim/molla/actions/workflows/ci.yml/badge.svg)](https://github.com/SumonMSelim/molla/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/SumonMSelim/molla/actions/workflows/codeql.yml/badge.svg)](https://github.com/SumonMSelim/molla/actions/workflows/codeql.yml)
+[![codecov](https://codecov.io/gh/SumonMSelim/molla/graph/badge.svg)](https://codecov.io/gh/SumonMSelim/molla)
 [![Cloudflare](https://img.shields.io/badge/Cloudflare-Workers%20%7C%20D1%20%7C%20Access-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com)
 [![Terraform](https://img.shields.io/badge/Terraform-1.16-844FBA?logo=terraform&logoColor=white)](https://www.terraform.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -11,7 +13,8 @@ molla is an open-source URL-shortening service that runs entirely on
 Cloudflare: one Worker serves redirects, the JSON API, and the static UI; D1
 is the authoritative store; the edge cache absorbs hot redirects; Access
 gates operator takedowns. It is sized to stay inside the Workers Free plan.
-The AWS (Go, Lambda, DynamoDB) implementation lives on the `aws` branch.
+The original AWS (Go, Lambda, DynamoDB) implementation is kept for
+reference on the `aws` branch; its infrastructure has been retired.
 
 ## Requirements
 
@@ -39,6 +42,14 @@ make web-lint      # oxlint
 make web-test      # vitest + jsdom
 make web-build     # web/dist
 make tf-check      # format-check and validate Terraform
+```
+
+Coverage (Istanbul for the worker, V8 for the web app) is written to
+`coverage/lcov.info` in each package:
+
+```sh
+cd worker && npm run coverage
+cd web && npm run coverage
 ```
 
 Use installed host toolchains by overriding command variables:
@@ -81,6 +92,23 @@ it creates the D1 database, the R2 state bucket, and the Access application
 whose audience the Worker needs. See `docs/RUNBOOK.md` for that bootstrap,
 the API token scopes, secrets, and the one-time GitHub Environment setup.
 
+## Security and CI
+
+- `ci.yml` lints, tests with coverage (uploaded to Codecov via the
+  `CODECOV_TOKEN` repository secret), builds, validates Terraform and runs
+  tfsec. `codeql.yml` scans the TypeScript weekly and on every PR.
+- Every third-party action is pinned to a commit SHA; Dependabot keeps the
+  actions, npm packages and Terraform providers current.
+- Workflows default to read-only `GITHUB_TOKEN` permissions and do not
+  persist checkout credentials. Dependencies install in a step that has no
+  access to the Cloudflare API token.
+- Production secrets live only in the `production` and `production-plan`
+  GitHub Environments. `production` accepts `v*.*.*` tags only.
+- Responses carry a strict CSP, HSTS and `nosniff`; the only third-party
+  origin allowed is Cloudflare's Web Analytics beacon.
+- `main` is protected by a ruleset: changes land through pull requests with
+  passing checks, and force pushes and deletion are blocked.
+
 ## Project layout
 
 ```text
@@ -92,6 +120,8 @@ worker/migrations/          D1 schema
 worker/test/                vitest (runs inside workerd); golden.json pins the Go output
 infra/terraform/cloudflare/ zone configuration
 web/                        static SPA (Vite) served at /app/*
+docs/                       runbook and Well-Architected review
+.github/workflows/          ci, codeql, terraform-plan, deploy
 ```
 
 ## Contributing
