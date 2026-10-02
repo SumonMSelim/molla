@@ -10,9 +10,10 @@ DOCKER_NPM_WEB = docker run --rm -v "$(CURDIR)/web":/src -w /src \
 DOCKER_NPM_WORKER = docker run --rm -v "$(CURDIR)/worker":/src -w /src $(NODE_IMAGE) npm
 NPM        ?= $(DOCKER_NPM_WEB)
 NPM_WORKER ?= $(DOCKER_NPM_WORKER)
-TF         ?= docker run --rm -v "$(CURDIR)/$(TF_DIR)":/w -w /w $(TF_IMAGE)
+# TF_DATA_DIR keeps tf-check off any .terraform left by a real backend init.
+TF         ?= docker run --rm -e TF_DATA_DIR=/w/.terraform-check -v "$(CURDIR)/$(TF_DIR)":/w -w /w $(TF_IMAGE)
 
-.PHONY: web-lint web-test web-build assets worker-lint worker-test worker-deploy dev tf-check
+.PHONY: web-lint web-test web-build assets worker-lint worker-test worker-deploy dev tf-check check
 
 web-lint:
 	cd web && $(NPM) ci && $(NPM) run lint
@@ -24,12 +25,14 @@ web-build:
 	cd web && $(NPM) ci && $(NPM) run build
 
 # The SPA is built with base /app/, so its output lands under public/app and
-# the root-level icons/manifest it references are copied beside it.
+# the root-level icons/manifest it references are copied beside it. site/ holds
+# the root-level discovery files (robots.txt, sitemap.xml, llms.txt, openapi.json).
 assets: web-build
 	rm -rf worker/public && mkdir -p worker/public/app
 	cp -R web/dist/. worker/public/app/
 	cp web/dist/favicon.ico web/dist/favicon.svg web/dist/apple-touch-icon.png \
 	   web/dist/icon-192.png web/dist/icon-512.png web/dist/site.webmanifest worker/public/
+	cp worker/site/* worker/public/
 
 worker-lint:
 	cd worker && $(NPM_WORKER) ci && $(NPM_WORKER) run lint
@@ -54,3 +57,6 @@ dev: assets
 tf-check:
 	$(TF) fmt -check -recursive
 	$(TF) init -backend=false -input=false >/dev/null && $(TF) validate
+
+# Everything CI verifies, in one command.
+check: worker-lint worker-test web-lint web-test tf-check

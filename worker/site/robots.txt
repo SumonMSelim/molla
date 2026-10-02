@@ -1,0 +1,12 @@
+# Short links (/<code>) redirect and count a click per request, so crawlers
+# are kept off them; only the site's own pages and discovery files are open.
+User-agent: *
+Disallow: /
+Allow: /$
+Allow: /app/
+Allow: /llms.txt
+Allow: /openapi.json
+Allow: /sitemap.xml
+Allow: /.well-known/
+
+Sitemap: https://mol.la/sitemap.xml

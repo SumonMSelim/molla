@@ -42,6 +42,7 @@ make web-lint      # oxlint
 make web-test      # vitest + jsdom
 make web-build     # web/dist
 make tf-check      # format-check and validate Terraform
+make check         # all of the above
 ```
 
 Coverage (Istanbul for the worker, V8 for the web app) is written to
@@ -116,6 +117,7 @@ worker/src/core/            provider-neutral domain logic (Base62, permutation, 
 worker/src/handlers/        create, redirect, stats, takedown
 worker/src/store.ts         D1 adapter (links, idempotency, counters, stats, audit)
 worker/src/access.ts        Cloudflare Access JWT verification
+worker/site/                robots.txt, sitemap.xml, llms.txt, openapi.json (site root)
 worker/migrations/          D1 schema
 worker/test/                vitest (runs inside workerd); golden.json pins the Go output
 infra/terraform/cloudflare/ zone configuration
@@ -123,6 +125,19 @@ web/                        static SPA (Vite) served at /app/*
 docs/                       runbook and Well-Architected review
 .github/workflows/          ci, codeql, terraform-plan, deploy
 ```
+
+## For agents and automation
+
+The site is meant to be usable without a browser:
+
+- `/openapi.json`: OpenAPI 3.1 contract for the public API.
+- `/llms.txt`: short guide for LLM agents; `/.well-known/api-catalog` (RFC 9727) and
+  `/.well-known/security.txt` (RFC 9116).
+- Error responses are `{"error", "message", "docs_url"}`; `429` carries `Retry-After`.
+- The About, Developers, Privacy and Terms pages are prerendered HTML.
+- `robots.txt` keeps crawlers off short links, since every request counts as a click.
+
+Contributors using coding agents should start with [AGENTS.md](AGENTS.md).
 
 ## Contributing
 

@@ -1,0 +1,28 @@
+# mol.la
+
+> mol.la is a free, open-source URL shortener. Anyone can create a short link with an optional custom alias and expiry; no account or API key is needed. It runs on Cloudflare Workers and D1.
+
+## API
+
+- [OpenAPI spec](https://mol.la/openapi.json): machine-readable contract for link creation and stats
+- [Developer docs](https://mol.la/app/developers/): endpoints, request and response bodies, error codes, cURL examples
+- [API catalog](https://mol.la/.well-known/api-catalog): RFC 9727 linkset pointing at the spec and docs
+
+## Site
+
+- [About](https://mol.la/app/about/): what the service does and does not do
+- [Terms](https://mol.la/app/terms/)
+- [Privacy](https://mol.la/app/privacy/)
+
+## Source
+
+- [GitHub repository](https://github.com/SumonMSelim/molla): code, runbook and architecture notes
+- [Security policy](https://mol.la/.well-known/security.txt)
+
+## Notes for agents
+
+- Create a link with `POST /api/v1/links` and a JSON body `{"long_url": "https://..."}`. Send an `Idempotency-Key` header so retries do not create duplicates.
+- Anonymous creation is limited to 10 requests per minute per IP. On HTTP 429 wait for the `Retry-After` interval.
+- Errors are JSON: `{"error": "CODE", "message": "...", "docs_url": "..."}`. Branch on `error`, not `message`.
+- Do not fetch short links (`/<code>`) just to inspect them: each request is a click and is counted. Use `GET /api/v1/links/{short_code}/stats` for link details.
+- `/admin/` is operator-only and not part of the public API.

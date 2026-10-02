@@ -1,5 +1,5 @@
 import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
+import { createRoot, hydrateRoot } from 'react-dom/client'
 import { App } from './App.tsx'
 import './index.css'
 
@@ -8,8 +8,16 @@ if (!root) {
   throw new Error('root element missing')
 }
 
-createRoot(root).render(
+const app = (
   <StrictMode>
     <App />
-  </StrictMode>,
+  </StrictMode>
 )
+
+// Static pages ship prerendered (scripts/prerender.mjs); hydrate those and
+// render the client-only pages from scratch.
+if (root.hasChildNodes()) {
+  hydrateRoot(root, app)
+} else {
+  createRoot(root).render(app)
+}
