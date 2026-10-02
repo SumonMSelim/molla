@@ -12,10 +12,51 @@
     <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
-    <title>mol.la</title>
+    <title>mol.la - free URL shortener</title>
+    <meta
+      name="description"
+      content="Free, open-source URL shortener. Create short links with an optional custom alias and expiry. No account needed; includes a public API."
+    />
+    <link rel="canonical" href="https://mol.la/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="mol.la" />
+    <meta property="og:title" content="mol.la - free URL shortener" />
+    <meta
+      property="og:description"
+      content="Free, open-source URL shortener. Create short links with an optional custom alias and expiry. No account needed; includes a public API."
+    />
+    <meta property="og:url" content="https://mol.la/" />
+    <link rel="service-desc" href="/openapi.json" type="application/json" />
+    <link rel="api-catalog" href="/.well-known/api-catalog" />
+    <link rel="alternate" href="/llms.txt" type="text/plain" title="llms.txt" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "mol.la",
+        "url": "https://mol.la/",
+        "description": "Free, open-source URL shortener with a public HTTP API.",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Any",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "license": "https://github.com/SumonMSelim/molla/blob/main/LICENSE",
+        "documentation": "https://mol.la/app/developers/"
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <h1>mol.la</h1>
+      <p>
+        mol.la is a free, open-source URL shortener. Creating a link needs JavaScript, but the API does not:
+        <code>POST https://mol.la/api/v1/links</code> with a JSON body such as <code>{"long_url": "https://example.com"}</code>.
+      </p>
+      <p>
+        See the <a href="/app/developers/">developer docs</a>, the <a href="/openapi.json">OpenAPI spec</a>, or
+        <a href="/llms.txt">llms.txt</a>.
+      </p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

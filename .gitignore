@@ -10,6 +10,7 @@ docs/*
 
 # Terraform
 .terraform/
+.terraform-check/
 *.tfstate
 *.tfstate.*
 
@@ -33,3 +34,5 @@ worker/worker-configuration.d.ts
 tfplan
 
 coverage/
+
+dist-ssr/

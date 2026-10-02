@@ -6,6 +6,7 @@ import { create } from './handlers/create'
 import { redirect } from './handlers/redirect'
 import { stats } from './handlers/stats'
 import { error, noStore, nowSeconds, withSecurityHeaders } from './http'
+import { wellKnown } from './wellknown'
 import { zonePurger } from './purge'
 import { AuditStore, IDAllocator, LinkStore, StatsStore } from './store'
 
@@ -23,8 +24,11 @@ const CODE_PATTERN = /^\/([^/]+)$/
 
 export default {
   async fetch(request, env, ctx): Promise<Response> {
-    const response = await route(request, env, ctx)
-    return withSecurityHeaders(response)
+    const response = withSecurityHeaders(await route(request, env, ctx))
+    if (new URL(request.url).pathname.startsWith('/api/')) {
+      response.headers.set('Link', '</openapi.json>; rel="service-desc"; type="application/json"')
+    }
+    return response
   },
 
   async scheduled(_event, env): Promise<void> {
@@ -48,7 +52,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     const ip = request.headers.get('CF-Connecting-IP') ?? ''
     const { success } = await env.CREATE_LIMITER.limit({ key: ip })
     if (!success) {
-      return error(429, 'RATE_LIMITED')
+      return error(429, 'RATE_LIMITED', { 'Retry-After': '60' })
     }
     return create(request, {
       store: new LinkStore(env.DB),
@@ -92,6 +96,10 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
       cache: caches.default,
       purge: zonePurger(env.CF_ZONE_ID, env.CF_PURGE_TOKEN),
     })
+  }
+
+  if (path.startsWith('/.well-known/')) {
+    return wellKnown(request, env.PUBLIC_BASE) ?? noStore(404)
   }
 
   if (path.startsWith('/api/') || path.startsWith('/admin/')) {

@@ -50,16 +50,16 @@ describe('create', () => {
     expect((await post('/api/v1/links', { long_url: 'https://example.com', alias: 'abc1234' })).status).toBe(201)
     const dup = await post('/api/v1/links', { long_url: 'https://other.example', alias: 'abc1234' })
     expect(dup.status).toBe(409)
-    expect(await dup.json()).toEqual({ error: 'ALIAS_TAKEN' })
+    expect(await dup.json()).toMatchObject({ error: 'ALIAS_TAKEN' })
   })
 
   it('validates input', async () => {
-    expect(await (await post('/api/v1/links', { long_url: 'ftp://x' })).json()).toEqual({ error: 'INVALID_URL' })
-    expect(await (await post('/api/v1/links', { long_url: 'https://x.y', alias: 'api' })).json()).toEqual({ error: 'INVALID_ALIAS' })
-    expect(await (await post('/api/v1/links', { long_url: 'https://x.y', expires_in: 1 })).json()).toEqual({ error: 'INVALID_EXPIRY' })
+    expect(await (await post('/api/v1/links', { long_url: 'ftp://x' })).json()).toMatchObject({ error: 'INVALID_URL' })
+    expect(await (await post('/api/v1/links', { long_url: 'https://x.y', alias: 'api' })).json()).toMatchObject({ error: 'INVALID_ALIAS' })
+    expect(await (await post('/api/v1/links', { long_url: 'https://x.y', expires_in: 1 })).json()).toMatchObject({ error: 'INVALID_EXPIRY' })
     const bad = await call('/api/v1/links', { method: 'POST', body: '{' })
     expect(bad.status).toBe(400)
-    expect(await bad.json()).toEqual({ error: 'INVALID_REQUEST' })
+    expect(await bad.json()).toMatchObject({ error: 'INVALID_REQUEST' })
     expect((await call('/api/v1/links', { method: 'GET' })).status).toBe(405)
   })
 
@@ -70,20 +70,21 @@ describe('create', () => {
     expect((await second.json<{ short_code: string }>()).short_code).toBe((await first.json<{ short_code: string }>()).short_code)
     const changed = await post('/api/v1/links', { long_url: 'https://changed.example' }, { 'Idempotency-Key': 'k1' })
     expect(changed.status).toBe(409)
-    expect(await changed.json()).toEqual({ error: 'IDEMPOTENCY_CONFLICT' })
+    expect(await changed.json()).toMatchObject({ error: 'IDEMPOTENCY_CONFLICT' })
     expect((await post('/api/v1/links', { long_url: 'https://example.com' }, { 'Idempotency-Key': 'bad key' })).status).toBe(400)
   })
 })
 
 describe('rate limit', () => {
   it('returns 429 once one IP exceeds the create ceiling', async () => {
-    let last = 0
+    let last: Response | undefined
     for (let i = 0; i < 12; i++) {
-      const res = await post('/api/v1/links', { long_url: 'https://example.com' }, { 'CF-Connecting-IP': '203.0.113.9' })
-      last = res.status
-      if (last === 429) break
+      last = await post('/api/v1/links', { long_url: 'https://example.com' }, { 'CF-Connecting-IP': '203.0.113.9' })
+      if (last.status === 429) break
     }
-    expect(last).toBe(429)
+    expect(last?.status).toBe(429)
+    expect(last?.headers.get('Retry-After')).toBe('60')
+    expect(await last?.json()).toMatchObject({ error: 'RATE_LIMITED' })
   })
 })
 
