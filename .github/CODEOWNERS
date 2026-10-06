@@ -1,0 +1,6 @@
+# Review owners. Not enforced until the main-protection ruleset requires
+# code owner review.
+*                          @SumonMSelim
+/.github/                  @SumonMSelim
+/infra/                    @SumonMSelim
+/worker/wrangler.jsonc     @SumonMSelim

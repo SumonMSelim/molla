@@ -1,0 +1,185 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "mol.la API",
+    "version": "1.0.0",
+    "summary": "Create short links and read their click counts.",
+    "description": "Public, unauthenticated API of the mol.la URL shortener. Creation is rate limited per client IP; retry after the Retry-After interval on HTTP 429.",
+    "license": { "name": "MIT", "url": "https://github.com/SumonMSelim/molla/blob/main/LICENSE" }
+  },
+  "servers": [{ "url": "https://mol.la" }],
+  "externalDocs": { "description": "Developer documentation", "url": "https://mol.la/app/developers/" },
+  "paths": {
+    "/api/v1/links": {
+      "post": {
+        "operationId": "createLink",
+        "summary": "Create a short link",
+        "description": "Creates a short link. Send an Idempotency-Key so a retried request returns the original link instead of creating another; reusing a key with a different body returns 409 IDEMPOTENCY_CONFLICT. Keys are remembered for 24 hours.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Client-chosen key, 1 to 128 printable ASCII characters (a UUID works).",
+            "schema": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[\\x21-\\x7e]+$" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateLinkRequest" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Link created.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Link" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/api/v1/links/{short_code}/stats": {
+      "get": {
+        "operationId": "getLinkStats",
+        "summary": "Read click statistics for a link",
+        "description": "Anyone who knows the short code can read its stats. Expired and taken-down links return 404.",
+        "parameters": [{ "$ref": "#/components/parameters/ShortCode" }],
+        "responses": {
+          "200": {
+            "description": "Click statistics.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Stats" } } }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/{short_code}": {
+      "get": {
+        "operationId": "followLink",
+        "summary": "Redirect to the destination",
+        "description": "Redirects with HTTP 302 to the long URL. Every request counts as a click, so do not call this to inspect a link; use getLinkStats instead.",
+        "parameters": [{ "$ref": "#/components/parameters/ShortCode" }],
+        "responses": {
+          "302": {
+            "description": "Redirect to the destination.",
+            "headers": { "Location": { "schema": { "type": "string", "format": "uri" } } }
+          },
+          "404": { "description": "The link does not exist, has expired, or was taken down. Empty body." }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "ShortCode": {
+        "name": "short_code",
+        "in": "path",
+        "required": true,
+        "description": "Generated 7-character code or a custom alias.",
+        "schema": { "type": "string", "minLength": 3, "maxLength": 32, "pattern": "^[A-Za-z0-9_-]+$" }
+      }
+    },
+    "schemas": {
+      "CreateLinkRequest": {
+        "type": "object",
+        "required": ["long_url"],
+        "additionalProperties": false,
+        "properties": {
+          "long_url": {
+            "type": "string",
+            "format": "uri",
+            "maxLength": 2048,
+            "description": "Absolute http or https URL without credentials. It is never fetched."
+          },
+          "alias": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 32,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "not": { "enum": ["api", "app"] },
+            "description": "Optional custom short code."
+          },
+          "expires_in": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 157680000,
+            "default": 157680000,
+            "description": "Lifetime in seconds. Defaults to 5 years."
+          }
+        }
+      },
+      "Link": {
+        "type": "object",
+        "required": ["short_code", "short_url", "long_url", "created_at", "expires_at"],
+        "properties": {
+          "short_code": { "type": "string" },
+          "short_url": { "type": "string", "format": "uri" },
+          "long_url": { "type": "string", "format": "uri" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "expires_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Stats": {
+        "type": "object",
+        "required": ["short_code", "short_url", "clicks", "created_at"],
+        "properties": {
+          "short_code": { "type": "string" },
+          "short_url": { "type": "string", "format": "uri" },
+          "clicks": { "type": "integer", "minimum": 0 },
+          "created_at": { "type": "string", "format": "date-time" },
+          "last_click_at": { "type": "string", "format": "date-time", "description": "Absent until the first click." }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error", "message", "docs_url"],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Stable machine-readable code; branch on this.",
+            "enum": [
+              "ALIAS_TAKEN",
+              "IDEMPOTENCY_CONFLICT",
+              "INVALID_ALIAS",
+              "INVALID_EXPIRY",
+              "INVALID_REQUEST",
+              "INVALID_URL",
+              "METHOD_NOT_ALLOWED",
+              "NOT_FOUND",
+              "RATE_LIMITED",
+              "TEMPORARILY_UNAVAILABLE"
+            ]
+          },
+          "message": { "type": "string", "description": "Human-readable explanation; wording may change." },
+          "docs_url": { "type": "string", "format": "uri" }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Validation failed: INVALID_URL, INVALID_ALIAS, INVALID_EXPIRY or INVALID_REQUEST.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Conflict": {
+        "description": "ALIAS_TAKEN or IDEMPOTENCY_CONFLICT.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "NotFound": {
+        "description": "NOT_FOUND: unknown, expired or taken-down code.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "RateLimited": {
+        "description": "RATE_LIMITED: at most 10 creations per minute per client IP.",
+        "headers": { "Retry-After": { "description": "Seconds to wait before retrying.", "schema": { "type": "integer" } } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Unavailable": {
+        "description": "TEMPORARILY_UNAVAILABLE: retry shortly.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    }
+  }
+}

@@ -26,8 +26,28 @@ export function json(status: number, body: unknown, headers: HeadersInit = {}): 
   })
 }
 
-export function error(status: number, code: string): Response {
-  return json(status, { error: code })
+// Public error codes with a human-readable message; docs/openapi.json lists the
+// same set (a worker test keeps the two in step). UNAUTHORIZED and FORBIDDEN
+// are admin-only and deliberately absent from the public spec.
+export const ERROR_MESSAGES: Record<string, string> = {
+  ALIAS_TAKEN: 'The requested alias is already in use.',
+  FORBIDDEN: 'This action is not permitted for the caller.',
+  IDEMPOTENCY_CONFLICT: 'The Idempotency-Key was already used with a different request body.',
+  INVALID_ALIAS: 'alias must be 3 to 32 letters, digits, hyphens or underscores, and not "api" or "app".',
+  INVALID_EXPIRY: 'expires_in must be a number of seconds between 60 and 157680000.',
+  INVALID_REQUEST: 'The request body or headers are malformed.',
+  INVALID_URL: 'long_url must be an absolute http or https URL of at most 2048 characters, without credentials.',
+  METHOD_NOT_ALLOWED: 'This method is not supported for this path.',
+  NOT_FOUND: 'No active link exists for this code.',
+  RATE_LIMITED: 'Too many requests; retry after the interval in the Retry-After header.',
+  TEMPORARILY_UNAVAILABLE: 'The service could not complete the request; retry shortly.',
+  UNAUTHORIZED: 'A valid Cloudflare Access assertion is required.',
+}
+
+export const DOCS_URL = 'https://mol.la/app/developers/'
+
+export function error(status: number, code: string, headers: HeadersInit = {}): Response {
+  return json(status, { error: code, message: ERROR_MESSAGES[code] ?? code, docs_url: DOCS_URL }, headers)
 }
 
 export function noStore(status: number): Response {

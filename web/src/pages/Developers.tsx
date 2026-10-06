@@ -3,10 +3,12 @@ import { Chrome, LegalDoc } from './Chrome.tsx'
 export function DevelopersPage() {
   return (
     <Chrome width="prose">
-      <LegalDoc title="Developers" updated="20 September 2026">
+      <LegalDoc title="Developers" updated="2 October 2026">
         <p>
           mol.la exposes a small public HTTP API for link creation and stats. Requests and responses are JSON. Base URL in
-          production is <code>https://mol.la</code>.
+          production is <code>https://mol.la</code>. A machine-readable contract is available as an{' '}
+          <a href="/openapi.json">OpenAPI 3.1 spec</a>, and the same links are listed in the{' '}
+          <a href="/.well-known/api-catalog">API catalog</a> and <a href="/llms.txt">llms.txt</a>.
         </p>
 
         <h2>Create short link</h2>
@@ -62,15 +64,25 @@ export function DevelopersPage() {
 
         <h2>Redirect behavior</h2>
         <p>
-          Visiting <code>GET /{'{short_code}'}</code> returns HTTP <code>302</code> to the destination URL when active.
+          Visiting <code>GET /{'{short_code}'}</code> returns HTTP <code>302</code> to the destination URL when active. Every
+          visit counts as a click, so read <code>/stats</code> rather than following a link to inspect it.
         </p>
 
         <h2>Error model</h2>
         <p>Errors return JSON:</p>
         <pre className="overflow-x-auto border border-border bg-card p-3 text-xs text-foreground">
-{`{ "error": "INVALID_URL" }`}
+{`{
+  "error": "INVALID_URL",
+  "message": "long_url must be an absolute http or https URL of at most 2048 characters, without credentials.",
+  "docs_url": "https://mol.la/app/developers/"
+}`}
         </pre>
-        <p>Common error codes:</p>
+        <p>
+          Branch on <code>error</code>, which is stable; <code>message</code> is for people and may change. Anonymous link
+          creation is limited to 10 requests per minute per IP. A <code>429</code> response carries a{' '}
+          <code>Retry-After</code> header in seconds.
+        </p>
+        <p>Error codes:</p>
         <ul>
           <li>
             <code>INVALID_URL</code>
@@ -95,6 +107,12 @@ export function DevelopersPage() {
           </li>
           <li>
             <code>NOT_FOUND</code>
+          </li>
+          <li>
+            <code>INVALID_REQUEST</code>
+          </li>
+          <li>
+            <code>METHOD_NOT_ALLOWED</code>
           </li>
         </ul>
 
