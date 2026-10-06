@@ -97,7 +97,7 @@ the API token scopes, secrets, and the one-time GitHub Environment setup.
 
 - `ci.yml` lints, tests with coverage (uploaded to Codecov via the
   `CODECOV_TOKEN` repository secret), builds, validates Terraform and runs
-  tfsec. `codeql.yml` scans the TypeScript weekly and on every PR.
+  Trivy. `codeql.yml` scans the TypeScript weekly and on every PR.
 - Every third-party action is pinned to a commit SHA; Dependabot keeps the
   actions, npm packages and Terraform providers current.
 - Workflows default to read-only `GITHUB_TOKEN` permissions and do not
