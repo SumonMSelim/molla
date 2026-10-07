@@ -23,6 +23,9 @@ env:
 
 jobs:
   plan:
+    # Dependabot runs cannot read the production-plan secrets, so the plan
+    # would only fail. A skipped job still satisfies a required check.
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: production-plan

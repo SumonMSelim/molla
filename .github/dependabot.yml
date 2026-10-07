@@ -11,10 +11,21 @@ updates:
     directory: /worker
     schedule:
       interval: weekly
+    ignore:
+      # @cloudflare/vitest-pool-workers peers on vitest ^4.1; lift this once
+      # a release supports vitest 5.
+      - dependency-name: "vitest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitest/*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: npm
     directory: /web
     schedule:
       interval: weekly
+    groups:
+      # vitest and its coverage provider must move together (peer dependency).
+      vitest:
+        patterns: ["vitest", "@vitest/*"]
   - package-ecosystem: terraform
     directory: /infra/terraform/cloudflare
     schedule:
