@@ -26,6 +26,9 @@ updates:
       # vitest and its coverage provider must move together (peer dependency).
       vitest:
         patterns: ["vitest", "@vitest/*"]
+      # react and react-dom must have the exact same version.
+      react:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
   - package-ecosystem: terraform
     directory: /infra/terraform/cloudflare
     schedule:
