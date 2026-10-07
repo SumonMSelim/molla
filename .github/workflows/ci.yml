@@ -36,7 +36,9 @@ jobs:
       - name: Lint and test worker
         run: make worker-lint NPM_WORKER=npm && cd worker && npm run coverage
 
+      # Dependabot runs cannot read Actions secrets, so they have no token.
       - name: Upload worker coverage
+        if: github.actor != 'dependabot[bot]'
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -62,6 +64,7 @@ jobs:
         run: make web-lint NPM=npm && cd web && npm run coverage && cd .. && make web-build NPM=npm
 
       - name: Upload web coverage
+        if: github.actor != 'dependabot[bot]'
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -85,6 +88,9 @@ jobs:
         run: make tf-check TF=terraform
 
       - name: Terraform security scan
-        uses: aquasecurity/tfsec-action@b466648d6e39e7c75324f25d83891162a721f2d6 # v1.0.3
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          working_directory: infra/terraform/cloudflare
+          scan-type: config
+          scan-ref: infra/terraform/cloudflare
+          severity: HIGH,CRITICAL
+          exit-code: "1"
