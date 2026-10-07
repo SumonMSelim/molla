@@ -36,3 +36,4 @@ tfplan
 coverage/
 
 dist-ssr/
+*.swp
