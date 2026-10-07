@@ -118,6 +118,12 @@ The route is `POST /admin/v1/links/{code}/takedown` with body
 `{"reason": "..."}`. It sits behind Cloudflare Access; the Worker verifies
 the Access JWT and records the attested identity as the actor.
 
+In a browser, open `https://mol.la/admin/`. Cloudflare Access asks for a
+one-time PIN sent to an operator email (`OPERATOR_EMAILS` repository
+variable, applied by the next release); the page looks the link up, asks
+for a reason, and confirms before calling the route. Sessions last one
+hour; an expired session shows a "reload to sign in" error.
+
 With the service token (from `terraform output -raw takedown_client_id` and
 `takedown_client_secret`):
 

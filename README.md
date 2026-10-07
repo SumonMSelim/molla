@@ -121,7 +121,7 @@ worker/site/                robots.txt, sitemap.xml, llms.txt, openapi.json (sit
 worker/migrations/          D1 schema
 worker/test/                vitest (runs inside workerd); golden.json pins the Go output
 infra/terraform/cloudflare/ zone configuration
-web/                        static SPA (Vite) served at /app/*
+web/                        static SPA (Vite) served at /app/* (and the operator page at /admin/)
 docs/                       runbook and Well-Architected review
 .github/workflows/          ci, codeql, terraform-plan, deploy
 ```

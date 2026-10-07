@@ -10,6 +10,8 @@ export type ApiErrorCode =
   | 'RATE_LIMITED'
   | 'TEMPORARILY_UNAVAILABLE'
   | 'NOT_FOUND'
+  | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
 
 export const ERROR_MESSAGES: Record<ApiErrorCode, string> = {
   INVALID_URL: 'URL is not a valid http(s) address.',
@@ -21,6 +23,8 @@ export const ERROR_MESSAGES: Record<ApiErrorCode, string> = {
   RATE_LIMITED: 'Too many requests; try again later.',
   TEMPORARILY_UNAVAILABLE: 'Service temporarily unavailable.',
   NOT_FOUND: 'Link not found.',
+  UNAUTHORIZED: 'Your Cloudflare Access session has expired. Reload the page to sign in again.',
+  FORBIDDEN: 'This identity is not allowed to take down links.',
 }
 
 export class ApiError extends Error {
@@ -120,10 +124,28 @@ export async function getStats(shortCode: string): Promise<LinkStats> {
   })
 }
 
+export type TakedownResult = {
+  short_code: string
+  deleted_at: string
+  version: number
+}
+
+// Operator-only. The route sits behind Cloudflare Access, which turns an
+// expired session into a redirect to the login page; `redirect: 'manual'`
+// surfaces that as an opaque redirect instead of an HTML body.
+export async function takedownLink(shortCode: string, reason: string): Promise<TakedownResult> {
+  return request<TakedownResult>(`/admin/v1/links/${encodeURIComponent(shortCode)}/takedown`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+    redirect: 'manual',
+  })
+}
+
 type RequestOptions = {
   method: string
   body?: string
   idempotencyKey?: string
+  redirect?: RequestRedirect
 }
 
 async function request<T>(path: string, options: RequestOptions): Promise<T> {
@@ -138,7 +160,11 @@ async function request<T>(path: string, options: RequestOptions): Promise<T> {
     method: options.method,
     headers,
     body: options.body,
+    redirect: options.redirect,
   })
+  if (response.type === 'opaqueredirect') {
+    throw new ApiError('UNAUTHORIZED', 401)
+  }
   const text = await response.text()
   let parsed: { error?: string } & T
   try {
