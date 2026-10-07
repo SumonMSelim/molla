@@ -157,10 +157,15 @@ describe('store', () => {
 
 describe('spa', () => {
   it('serves the shell for deep links and the root', async () => {
-    for (const path of ['/', '/app', '/app/links/abc1234']) {
+    for (const path of ['/', '/app', '/app/links/abc1234', '/admin', '/admin/']) {
       const res = await call(path)
       expect(res.status, path).toBe(200)
       expect(await res.text()).toContain('<div id="root">')
     }
+  })
+
+  it('serves nothing else under /admin', async () => {
+    expect((await call('/admin/other')).status).toBe(404)
+    expect((await call('/admin/', { method: 'POST' })).status).toBe(404)
   })
 })

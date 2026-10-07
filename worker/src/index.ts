@@ -45,6 +45,13 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     return spa(request, env)
   }
 
+  // The operator page. Access gates /admin/* at the edge, so the shell
+  // itself is only reachable after login; the takedown call below carries
+  // the same Access session.
+  if ((path === '/admin' || path === '/admin/') && (method === 'GET' || method === 'HEAD')) {
+    return spa(request, env)
+  }
+
   if (path === LINKS_PATH) {
     if (method !== 'POST') {
       return error(405, 'METHOD_NOT_ALLOWED')

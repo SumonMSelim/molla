@@ -30,4 +30,10 @@ describe('App', () => {
     render(<App />)
     expect(screen.getByRole('heading', { name: 'Privacy' })).toBeInTheDocument()
   })
+
+  it('shows the operator page at /admin/', () => {
+    window.history.replaceState(null, '', '/admin/')
+    render(<App />)
+    expect(screen.getByRole('heading', { name: 'Takedown' })).toBeInTheDocument()
+  })
 })

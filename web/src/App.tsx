@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AboutPage } from './pages/About.tsx'
+import { AdminPage } from './pages/Admin.tsx'
 import { CreatePage } from './pages/Create.tsx'
 import { DevelopersPage } from './pages/Developers.tsx'
 import { PrivacyPage } from './pages/Privacy.tsx'
@@ -38,6 +39,9 @@ export function App() {
   }
   if (path === '/app/privacy' || path === '/app/privacy/') {
     return <PrivacyPage />
+  }
+  if (path === '/admin' || path === '/admin/') {
+    return <AdminPage />
   }
 
   return (

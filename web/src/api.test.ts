@@ -9,6 +9,7 @@ import {
   loadLinks,
   messageFor,
   rememberLink,
+  takedownLink,
 } from './api.ts'
 
 afterEach(() => {
@@ -124,5 +125,29 @@ describe('getStats', () => {
     expect(path).toBe('/api/v1/links/abc/stats')
     const headers = init.headers as Record<string, string>
     expect(headers['X-Api-Key']).toBeUndefined()
+  })
+})
+
+describe('takedownLink', () => {
+  it('posts the reason to the admin route without following redirects', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      type: 'basic',
+      text: async () => JSON.stringify({ short_code: 'abc', deleted_at: '2026-10-08T00:00:00Z', version: 2 }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const result = await takedownLink('abc', 'phishing')
+    expect(result.version).toBe(2)
+    const [path, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(path).toBe('/admin/v1/links/abc/takedown')
+    expect(init.method).toBe('POST')
+    expect(init.redirect).toBe('manual')
+    expect(JSON.parse(String(init.body))).toEqual({ reason: 'phishing' })
+  })
+
+  it('maps the Access login redirect to UNAUTHORIZED', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 0, type: 'opaqueredirect', text: async () => '' }))
+    await expect(takedownLink('abc', 'phishing')).rejects.toMatchObject({ code: 'UNAUTHORIZED', status: 401 })
   })
 })
