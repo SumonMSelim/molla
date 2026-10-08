@@ -1,5 +1,15 @@
 import { useEffect, useId, useState, type FormEvent } from 'react'
-import { ApiError, getAudit, getStats, takedownLink, type AuditEvent, type LinkStats, type TakedownResult } from '../api.ts'
+import {
+  ApiError,
+  getAudit,
+  getStats,
+  getTopLinks,
+  takedownLink,
+  type AuditEvent,
+  type LinkStats,
+  type TakedownResult,
+  type TopLink,
+} from '../api.ts'
 import { Chrome } from './Chrome.tsx'
 
 const fieldClass =
@@ -21,10 +31,22 @@ export function AdminPage() {
   const [result, setResult] = useState<TakedownResult | null>(null)
   const [events, setEvents] = useState<AuditEvent[] | null>(null)
   const [auditError, setAuditError] = useState('')
+  const [top, setTop] = useState<TopLink[] | null>(null)
+  const [topError, setTopError] = useState('')
 
   useEffect(() => {
+    void loadTop()
     void loadAudit()
   }, [])
+
+  async function loadTop() {
+    try {
+      setTop(await getTopLinks())
+      setTopError('')
+    } catch (err) {
+      setTopError(describe(err))
+    }
+  }
 
   async function loadAudit() {
     try {
@@ -59,6 +81,7 @@ export function AdminPage() {
     setBusy(true)
     try {
       setResult(await takedownLink(stats.short_code, reason.trim()))
+      void loadTop()
       void loadAudit()
       setStats(null)
       setConfirming(false)
@@ -195,6 +218,51 @@ export function AdminPage() {
           <p className="mt-2 text-xs text-muted-foreground">Deleted at {result.deleted_at}</p>
         </div>
       ) : null}
+
+      <section className="mt-8 border border-border bg-card p-6 sm:p-8">
+        <h2 className="text-section font-semibold">Top links</h2>
+        <p className="mt-2 text-xs text-muted-foreground">
+          The 20 most-clicked live links. Pick a code to load it into the lookup above.
+        </p>
+        {topError ? (
+          <p className="mt-4 bg-destructive-soft px-3 py-2 text-sm text-destructive" role="alert">
+            {topError}
+          </p>
+        ) : top === null ? (
+          <p className="mt-4 text-sm text-muted-foreground">Loading…</p>
+        ) : top.length === 0 ? (
+          <p className="mt-4 text-sm text-muted-foreground">No clicks yet.</p>
+        ) : (
+          <table className="mt-4 w-full border border-border text-left text-xs">
+            <thead className="text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">Code</th>
+                <th className="px-3 py-2 font-medium">Destination</th>
+                <th className="px-3 py-2 text-right font-medium">Clicks</th>
+                <th className="px-3 py-2 font-medium">Last click</th>
+              </tr>
+            </thead>
+            <tbody>
+              {top.map((link) => (
+                <tr key={link.short_code} className="border-t border-border">
+                  <td className="px-3 py-2">
+                    <button
+                      type="button"
+                      onClick={() => setCode(link.short_code)}
+                      className="font-mono text-brand hover:glow-text"
+                    >
+                      {link.short_code}
+                    </button>
+                  </td>
+                  <td className="break-all px-3 py-2">{link.long_url}</td>
+                  <td className="px-3 py-2 text-right font-mono tabular-nums">{link.clicks}</td>
+                  <td className="px-3 py-2 font-mono whitespace-nowrap">{link.last_click_at ?? 'None yet'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
 
       <section className="mt-8 border border-border bg-card p-6 sm:p-8">
         <h2 className="text-section font-semibold">Recent takedowns</h2>

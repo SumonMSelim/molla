@@ -142,6 +142,10 @@ for at most 60s). The `audit` table records actor, reason, and outcome.
 `GET /admin/v1/audit` (same Access gate) returns the newest 50 audit events;
 the operator page lists them under "Recent takedowns".
 
+`GET /admin/v1/top` (same Access gate) returns the 20 most-clicked live
+links with their destinations; the operator page lists them under "Top
+links" so phishing targets stand out.
+
 ## Restore
 
 D1 Time Travel keeps 30 days of history on every plan:

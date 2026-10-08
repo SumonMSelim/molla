@@ -7,6 +7,7 @@ import {
   type Link,
   type Principal,
   type Stats,
+  type TopLink,
 } from './platform'
 
 type AuditRow = {
@@ -224,6 +225,24 @@ export class StatsStore {
       throw new PlatformError('not_found')
     }
     return { shortCode: row.short_code, clicks: row.clicks, lastClickAt: row.last_click_at }
+  }
+
+  // Most-clicked live links, for the operator page. Deleted and expired
+  // links are left out so the list only shows what still resolves.
+  async top(limit: number, now: number): Promise<TopLink[]> {
+    const rows = await this.db
+      .prepare(
+        'SELECT s.short_code, l.long_url, s.clicks, l.created_at, s.last_click_at FROM stats s JOIN links l ON l.short_code = s.short_code WHERE l.is_active = 1 AND l.expires_at > ? ORDER BY s.clicks DESC, s.last_click_at DESC LIMIT ?',
+      )
+      .bind(now, limit)
+      .all<{ short_code: string; long_url: string; clicks: number; created_at: number; last_click_at: number }>()
+    return rows.results.map((row) => ({
+      shortCode: row.short_code,
+      longURL: row.long_url,
+      clicks: row.clicks,
+      createdAt: row.created_at,
+      lastClickAt: row.last_click_at,
+    }))
   }
 
   async increment(code: string, delta: number, lastClickAt: number): Promise<void> {

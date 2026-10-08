@@ -1,7 +1,7 @@
 import { validateAlias } from '../core/validate'
 import { error, json, nowSeconds, rfc3339 } from '../http'
 import { isPlatformError, type Principal } from '../platform'
-import type { AuditStore, LinkStore } from '../store'
+import type { AuditStore, LinkStore, StatsStore } from '../store'
 import { cacheKeyFor } from './redirect'
 
 // Takedown is operator-only. The route sits behind Cloudflare Access and the
@@ -92,6 +92,34 @@ export async function listAudit(audit: AuditStore): Promise<Response> {
     })
   } catch (err) {
     console.error('audit list failed', { error: String(err) })
+    return error(503, 'TEMPORARILY_UNAVAILABLE')
+  }
+}
+
+// Most-clicked live links, for the operator page. Long URLs are included on
+// purpose: the point is to spot phishing targets at a glance.
+export const TOP_LIMIT = 20
+
+export async function topLinks(stats: StatsStore, publicBase: string): Promise<Response> {
+  try {
+    const links = await stats.top(TOP_LIMIT, nowSeconds())
+    return json(200, {
+      links: links.map((link) => {
+        const body: Record<string, unknown> = {
+          short_code: link.shortCode,
+          short_url: `${publicBase}/${link.shortCode}`,
+          long_url: link.longURL,
+          clicks: link.clicks,
+          created_at: rfc3339(link.createdAt),
+        }
+        if (link.lastClickAt !== 0) {
+          body.last_click_at = rfc3339(link.lastClickAt)
+        }
+        return body
+      }),
+    })
+  } catch (err) {
+    console.error('top links failed', { error: String(err) })
     return error(503, 'TEMPORARILY_UNAVAILABLE')
   }
 }
