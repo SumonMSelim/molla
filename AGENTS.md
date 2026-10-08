@@ -37,7 +37,9 @@ first (`make assets`), because tests serve the real built assets.
   Cloudflare allows one zone ruleset per phase.
 - **The CSP string exists in three places that must match**:
   `worker/src/http.ts`, `web/index.html`, `infra/terraform/cloudflare/main.tf`
-  (plus the dev-only rewrite regex in `web/vite.config.ts`).
+  (plus the dev-only rewrite regex in `web/vite.config.ts`). One exception:
+  the `<meta>` copy omits `frame-ancestors`, which browsers ignore (and warn
+  about) when delivered via `<meta>`; the header copies enforce it.
 - **API contract has three copies**: handlers, `worker/site/openapi.json`, and
   the Developers page (`web/src/pages/Developers.tsx`). `worker/test/agent.test.ts`
   fails when the spec's error codes or response fields drift from the code.
