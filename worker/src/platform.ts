@@ -45,6 +45,14 @@ export type Stats = {
   lastClickAt: number
 }
 
+export type TopLink = {
+  shortCode: string
+  longURL: string
+  clicks: number
+  createdAt: number
+  lastClickAt: number
+}
+
 export type AuditEvent = {
   actorID: string
   role: Role

@@ -7,6 +7,7 @@ import {
   forgetLink,
   getAudit,
   getStats,
+  getTopLinks,
   loadLinks,
   messageFor,
   rememberLink,
@@ -161,6 +162,19 @@ describe('getAudit', () => {
     expect(await getAudit()).toEqual(events)
     const [path, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(path).toBe('/admin/v1/audit')
+    expect(init.method).toBe('GET')
+    expect(init.redirect).toBe('manual')
+  })
+})
+
+describe('getTopLinks', () => {
+  it('fetches the top links without following redirects and unwraps links', async () => {
+    const links = [{ short_code: 'abc', short_url: 'https://mol.la/abc', long_url: 'https://e.com', clicks: 5, created_at: '2026-10-08T00:00:00Z' }]
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, type: 'basic', text: async () => JSON.stringify({ links }) })
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await getTopLinks()).toEqual(links)
+    const [path, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(path).toBe('/admin/v1/top')
     expect(init.method).toBe('GET')
     expect(init.redirect).toBe('manual')
   })

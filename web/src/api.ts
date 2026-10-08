@@ -156,6 +156,20 @@ export async function getAudit(): Promise<AuditEvent[]> {
   return result.events
 }
 
+export type TopLink = {
+  short_code: string
+  short_url: string
+  long_url: string
+  clicks: number
+  created_at: string
+  last_click_at?: string
+}
+
+export async function getTopLinks(): Promise<TopLink[]> {
+  const result = await request<{ links: TopLink[] }>('/admin/v1/top', { method: 'GET', redirect: 'manual' })
+  return result.links
+}
+
 type RequestOptions = {
   method: string
   body?: string

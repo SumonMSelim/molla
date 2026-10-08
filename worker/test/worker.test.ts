@@ -1,8 +1,8 @@
 import { createExecutionContext, env, waitOnExecutionContext } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
 import worker from '../src/index'
-import { listAudit } from '../src/handlers/admin'
-import { AuditStore, LinkStore } from '../src/store'
+import { listAudit, topLinks } from '../src/handlers/admin'
+import { AuditStore, LinkStore, StatsStore } from '../src/store'
 
 const BASE = 'http://localhost:8787'
 
@@ -162,6 +162,44 @@ describe('audit', () => {
     const res = await listAudit(broken)
     expect(res.status).toBe(503)
     expect(await res.json()).toMatchObject({ error: 'TEMPORARILY_UNAVAILABLE' })
+  })
+})
+
+describe('top links', () => {
+  it('requires an Access assertion and only answers GET', async () => {
+    expect((await call('/admin/v1/top')).status).toBe(401)
+    expect((await post('/admin/v1/top', {})).status).toBe(405)
+  })
+
+  it('ranks live links by clicks and skips deleted and expired ones', async () => {
+    const stats = new StatsStore(env.DB)
+    for (const alias of ['busy000', 'quiet00', 'gone000', 'stale00']) {
+      await post('/api/v1/links', { long_url: `https://example.com/${alias}`, alias })
+    }
+    await stats.increment('busy000', 5, 500)
+    await stats.increment('quiet00', 1, 100)
+    await stats.increment('gone000', 9, 900)
+    await stats.increment('stale00', 9, 900)
+    await new LinkStore(env.DB).softDelete({ actorID: 'ops', role: 'operator', ownerID: '' }, 'gone000', 1000, 'abuse')
+    await env.DB.prepare("UPDATE links SET expires_at = 1 WHERE short_code = 'stale00'").run()
+
+    const res = await topLinks(stats, 'https://mol.la')
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { links: Array<Record<string, unknown>> }
+    expect(body.links.map((l) => l.short_code)).toEqual(['busy000', 'quiet00'])
+    expect(body.links[0]).toMatchObject({
+      short_url: 'https://mol.la/busy000',
+      long_url: 'https://example.com/busy000',
+      clicks: 5,
+      last_click_at: '1970-01-01T00:08:20Z',
+    })
+    expect(typeof body.links[0].created_at).toBe('string')
+  })
+
+  it('answers 503 when the store fails', async () => {
+    const broken = { top: async () => Promise.reject(new Error('d1 down')) } as unknown as StatsStore
+    const res = await topLinks(broken, 'https://mol.la')
+    expect(res.status).toBe(503)
   })
 })
 

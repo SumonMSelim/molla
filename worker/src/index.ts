@@ -1,7 +1,7 @@
 import { AccessVerifier } from './access'
 import { Permuter } from './core/permute'
 import type { Env } from './env'
-import { listAudit, takedown } from './handlers/admin'
+import { listAudit, takedown, topLinks } from './handlers/admin'
 import { create } from './handlers/create'
 import { redirect } from './handlers/redirect'
 import { stats } from './handlers/stats'
@@ -21,6 +21,7 @@ const LINKS_PATH = '/api/v1/links'
 const STATS_PATTERN = /^\/api\/v1\/links\/([^/]+)\/stats$/
 const TAKEDOWN_PATTERN = /^\/admin\/v1\/links\/([^/]+)\/takedown$/
 const AUDIT_PATH = '/admin/v1/audit'
+const TOP_PATH = '/admin/v1/top'
 const CODE_PATTERN = /^\/([^/]+)$/
 
 export default {
@@ -83,7 +84,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
   }
 
   const takedownMatch = TAKEDOWN_PATTERN.exec(path)
-  if (takedownMatch !== null || path === AUDIT_PATH) {
+  if (takedownMatch !== null || path === AUDIT_PATH || path === TOP_PATH) {
     if (method !== (takedownMatch !== null ? 'POST' : 'GET')) {
       return error(405, 'METHOD_NOT_ALLOWED')
     }
@@ -97,6 +98,9 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     }
     if (principal === null) {
       return error(401, 'UNAUTHORIZED')
+    }
+    if (path === TOP_PATH) {
+      return topLinks(new StatsStore(env.DB), env.PUBLIC_BASE)
     }
     if (takedownMatch === null) {
       return listAudit(new AuditStore(env.DB))
