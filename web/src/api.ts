@@ -16,7 +16,7 @@ export type ApiErrorCode =
 export const ERROR_MESSAGES: Record<ApiErrorCode, string> = {
   INVALID_URL: 'URL is not a valid http(s) address.',
   INVALID_ALIAS: 'Alias fails charset or length rules.',
-  INVALID_EXPIRY: 'Expiry must be between 60 and 157680000 seconds.',
+  INVALID_EXPIRY: 'Expiry must be between 1 minute and 5 years.',
   INVALID_REQUEST: 'Request is invalid.',
   ALIAS_TAKEN: 'That alias is already taken.',
   IDEMPOTENCY_CONFLICT: 'Idempotency key was used for a different request.',

@@ -7,6 +7,9 @@ import { QrCode } from './QrCode.tsx'
 const fieldClass =
   'flex h-12 w-full border border-input bg-background px-3.5 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-brand focus-visible:glow'
 
+const EXPIRY_UNITS = { minutes: 60, hours: 3600, days: 86400 } as const
+type ExpiryUnit = keyof typeof EXPIRY_UNITS
+
 type CreatePageProps = {
   selected: string | null
   onOpen: (code: string) => void
@@ -17,9 +20,11 @@ export function CreatePage({ selected, onOpen, onClear }: CreatePageProps) {
   const urlId = useId()
   const aliasId = useId()
   const expiryId = useId()
+  const expiryUnitId = useId()
   const [longUrl, setLongUrl] = useState('')
   const [alias, setAlias] = useState('')
   const [expiresIn, setExpiresIn] = useState('')
+  const [expiryUnit, setExpiryUnit] = useState<ExpiryUnit>('days')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [created, setCreated] = useState<StoredLink | null>(null)
@@ -31,7 +36,7 @@ export function CreatePage({ selected, onOpen, onClear }: CreatePageProps) {
     setCopied(false)
     setBusy(true)
     try {
-      const expires_in = expiresIn.trim() === '' ? undefined : Number(expiresIn)
+      const expires_in = expiresIn.trim() === '' ? undefined : Number(expiresIn) * EXPIRY_UNITS[expiryUnit]
       const result = await createLink({
         long_url: longUrl.trim(),
         alias: alias.trim() || undefined,
@@ -132,18 +137,30 @@ export function CreatePage({ selected, onOpen, onClear }: CreatePageProps) {
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="text-sm font-medium" htmlFor={expiryId}>
-                      Expires in seconds (optional)
+                      Expires in (optional)
                     </label>
-                    <input
-                      id={expiryId}
-                      name="expires_in"
-                      type="number"
-                      min={60}
-                      max={157680000}
-                      value={expiresIn}
-                      onChange={(e) => setExpiresIn(e.target.value)}
-                      className={fieldClass}
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        id={expiryId}
+                        name="expiry_amount"
+                        type="number"
+                        min={1}
+                        value={expiresIn}
+                        onChange={(e) => setExpiresIn(e.target.value)}
+                        className={fieldClass}
+                      />
+                      <select
+                        id={expiryUnitId}
+                        aria-label="Expiry unit"
+                        value={expiryUnit}
+                        onChange={(e) => setExpiryUnit(e.target.value as ExpiryUnit)}
+                        className={`${fieldClass} w-auto`}
+                      >
+                        <option value="minutes">minutes</option>
+                        <option value="hours">hours</option>
+                        <option value="days">days</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               </details>
