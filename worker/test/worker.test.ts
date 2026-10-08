@@ -156,6 +156,13 @@ describe('audit', () => {
       ts: '1970-01-01T00:03:20Z',
     })
   })
+
+  it('answers 503 when the store fails', async () => {
+    const broken = { list: async () => Promise.reject(new Error('d1 down')) } as unknown as AuditStore
+    const res = await listAudit(broken)
+    expect(res.status).toBe(503)
+    expect(await res.json()).toMatchObject({ error: 'TEMPORARILY_UNAVAILABLE' })
+  })
 })
 
 describe('store', () => {
