@@ -1,5 +1,5 @@
 import { validateAlias } from '../core/validate'
-import { error, json, nowSeconds } from '../http'
+import { error, json, nowSeconds, rfc3339 } from '../http'
 import { isPlatformError, type Principal } from '../platform'
 import type { AuditStore, LinkStore } from '../store'
 import { cacheKeyFor } from './redirect'
@@ -69,6 +69,29 @@ export async function takedown(
       return error(403, 'FORBIDDEN')
     }
     console.error('soft delete failed', { short_code: code, actor_id: principal.actorID, error: String(err) })
+    return error(503, 'TEMPORARILY_UNAVAILABLE')
+  }
+}
+
+// Newest-first slice of the takedown audit trail, for the operator page.
+export const AUDIT_LIMIT = 50
+
+export async function listAudit(audit: AuditStore): Promise<Response> {
+  try {
+    const events = await audit.list(AUDIT_LIMIT)
+    return json(200, {
+      events: events.map((event) => ({
+        actor_id: event.actorID,
+        role: event.role,
+        owner_id: event.ownerID,
+        short_code: event.shortCode,
+        reason: event.reason,
+        outcome: event.outcome,
+        ts: rfc3339(event.timestamp),
+      })),
+    })
+  } catch (err) {
+    console.error('audit list failed', { error: String(err) })
     return error(503, 'TEMPORARILY_UNAVAILABLE')
   }
 }

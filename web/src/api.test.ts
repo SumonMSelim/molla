@@ -5,6 +5,7 @@ import {
   LINKS_STORAGE,
   createLink,
   forgetLink,
+  getAudit,
   getStats,
   loadLinks,
   messageFor,
@@ -149,5 +150,18 @@ describe('takedownLink', () => {
   it('maps the Access login redirect to UNAUTHORIZED', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 0, type: 'opaqueredirect', text: async () => '' }))
     await expect(takedownLink('abc', 'phishing')).rejects.toMatchObject({ code: 'UNAUTHORIZED', status: 401 })
+  })
+})
+
+describe('getAudit', () => {
+  it('fetches the audit log without following redirects and unwraps events', async () => {
+    const events = [{ actor_id: 'ops', role: 'operator', owner_id: '', short_code: 'abc', reason: 'spam', outcome: 'deleted', ts: '2026-10-08T00:00:00Z' }]
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, type: 'basic', text: async () => JSON.stringify({ events }) })
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await getAudit()).toEqual(events)
+    const [path, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(path).toBe('/admin/v1/audit')
+    expect(init.method).toBe('GET')
+    expect(init.redirect).toBe('manual')
   })
 })

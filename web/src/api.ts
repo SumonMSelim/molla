@@ -141,6 +141,21 @@ export async function takedownLink(shortCode: string, reason: string): Promise<T
   })
 }
 
+export type AuditEvent = {
+  actor_id: string
+  role: string
+  owner_id: string
+  short_code: string
+  reason: string
+  outcome: string
+  ts: string
+}
+
+export async function getAudit(): Promise<AuditEvent[]> {
+  const result = await request<{ events: AuditEvent[] }>('/admin/v1/audit', { method: 'GET', redirect: 'manual' })
+  return result.events
+}
+
 type RequestOptions = {
   method: string
   body?: string

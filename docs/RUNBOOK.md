@@ -139,6 +139,9 @@ Soft-delete in D1, edge cache delete for the current colo, zone purge of the
 URL when `CF_PURGE_TOKEN` is set (otherwise other colos serve the cached 302
 for at most 60s). The `audit` table records actor, reason, and outcome.
 
+`GET /admin/v1/audit` (same Access gate) returns the newest 50 audit events;
+the operator page lists them under "Recent takedowns".
+
 ## Restore
 
 D1 Time Travel keeps 30 days of history on every plan:
