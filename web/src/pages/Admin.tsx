@@ -60,7 +60,7 @@ export function AdminPage() {
       <div className="animate-fade-up pb-10">
         <p className="font-mono text-xs font-medium tracking-[0.12em] text-brand-text uppercase glow-text">operator</p>
         <h1 className="mt-4 text-display font-semibold">Takedown</h1>
-        <p className="mt-5 max-w-md text-prose text-muted-foreground">
+        <p className="mt-5 text-prose text-muted-foreground">
           Look up a short link, then remove it. Removal is a soft delete: the link stops resolving immediately and
           the action is recorded in the audit log under your Access identity.
         </p>
