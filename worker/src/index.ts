@@ -1,7 +1,7 @@
 import { AccessVerifier } from './access'
 import { Permuter } from './core/permute'
 import type { Env } from './env'
-import { takedown } from './handlers/admin'
+import { listAudit, takedown } from './handlers/admin'
 import { create } from './handlers/create'
 import { redirect } from './handlers/redirect'
 import { stats } from './handlers/stats'
@@ -20,6 +20,7 @@ let verifier: AccessVerifier | null = null
 const LINKS_PATH = '/api/v1/links'
 const STATS_PATTERN = /^\/api\/v1\/links\/([^/]+)\/stats$/
 const TAKEDOWN_PATTERN = /^\/admin\/v1\/links\/([^/]+)\/takedown$/
+const AUDIT_PATH = '/admin/v1/audit'
 const CODE_PATTERN = /^\/([^/]+)$/
 
 export default {
@@ -82,8 +83,8 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
   }
 
   const takedownMatch = TAKEDOWN_PATTERN.exec(path)
-  if (takedownMatch !== null) {
-    if (method !== 'POST') {
+  if (takedownMatch !== null || path === AUDIT_PATH) {
+    if (method !== (takedownMatch !== null ? 'POST' : 'GET')) {
       return error(405, 'METHOD_NOT_ALLOWED')
     }
     verifier ??= new AccessVerifier(env.ACCESS_TEAM_DOMAIN, env.ACCESS_AUD)
@@ -96,6 +97,9 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     }
     if (principal === null) {
       return error(401, 'UNAUTHORIZED')
+    }
+    if (takedownMatch === null) {
+      return listAudit(new AuditStore(env.DB))
     }
     return takedown(request, takedownMatch[1], principal, {
       store: new LinkStore(env.DB),

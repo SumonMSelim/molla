@@ -1,5 +1,5 @@
-import { useId, useState, type FormEvent } from 'react'
-import { ApiError, getStats, takedownLink, type LinkStats, type TakedownResult } from '../api.ts'
+import { useEffect, useId, useState, type FormEvent } from 'react'
+import { ApiError, getAudit, getStats, takedownLink, type AuditEvent, type LinkStats, type TakedownResult } from '../api.ts'
 import { Chrome } from './Chrome.tsx'
 
 const fieldClass =
@@ -19,6 +19,21 @@ export function AdminPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<TakedownResult | null>(null)
+  const [events, setEvents] = useState<AuditEvent[] | null>(null)
+  const [auditError, setAuditError] = useState('')
+
+  useEffect(() => {
+    void loadAudit()
+  }, [])
+
+  async function loadAudit() {
+    try {
+      setEvents(await getAudit())
+      setAuditError('')
+    } catch (err) {
+      setAuditError(describe(err))
+    }
+  }
 
   async function onLookup(event: FormEvent) {
     event.preventDefault()
@@ -44,6 +59,7 @@ export function AdminPage() {
     setBusy(true)
     try {
       setResult(await takedownLink(stats.short_code, reason.trim()))
+      void loadAudit()
       setStats(null)
       setConfirming(false)
     } catch (err) {
@@ -179,6 +195,43 @@ export function AdminPage() {
           <p className="mt-2 text-xs text-muted-foreground">Deleted at {result.deleted_at}</p>
         </div>
       ) : null}
+
+      <section className="mt-8 border border-border bg-card p-6 sm:p-8">
+        <h2 className="text-section font-semibold">Recent takedowns</h2>
+        <p className="mt-2 text-xs text-muted-foreground">Last 50 events from the audit log, newest first.</p>
+        {auditError ? (
+          <p className="mt-4 bg-destructive-soft px-3 py-2 text-sm text-destructive" role="alert">
+            {auditError}
+          </p>
+        ) : events === null ? (
+          <p className="mt-4 text-sm text-muted-foreground">Loading…</p>
+        ) : events.length === 0 ? (
+          <p className="mt-4 text-sm text-muted-foreground">No takedowns yet.</p>
+        ) : (
+          <table className="mt-4 w-full border border-border text-left text-xs">
+            <thead className="text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">When</th>
+                <th className="px-3 py-2 font-medium">Code</th>
+                <th className="px-3 py-2 font-medium">Actor</th>
+                <th className="px-3 py-2 font-medium">Reason</th>
+                <th className="px-3 py-2 font-medium">Outcome</th>
+              </tr>
+            </thead>
+            <tbody>
+              {events.map((event, i) => (
+                <tr key={`${event.ts}-${event.short_code}-${i}`} className="border-t border-border">
+                  <td className="px-3 py-2 font-mono whitespace-nowrap">{event.ts}</td>
+                  <td className="px-3 py-2 font-mono text-brand">{event.short_code}</td>
+                  <td className="break-all px-3 py-2">{event.actor_id}</td>
+                  <td className="px-3 py-2">{event.reason}</td>
+                  <td className="px-3 py-2 font-mono">{event.outcome}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
     </Chrome>
   )
 }

@@ -9,6 +9,16 @@ import {
   type Stats,
 } from './platform'
 
+type AuditRow = {
+  actor_id: string
+  role: AuditEvent['role']
+  owner_id: string
+  short_code: string
+  reason: string
+  outcome: string
+  ts: number
+}
+
 type LinkRow = {
   short_code: string
   long_url: string
@@ -275,5 +285,21 @@ export class AuditStore {
         event.timestamp,
       )
       .run()
+  }
+
+  async list(limit: number): Promise<AuditEvent[]> {
+    const rows = await this.db
+      .prepare('SELECT actor_id, role, owner_id, short_code, reason, outcome, ts FROM audit ORDER BY id DESC LIMIT ?')
+      .bind(limit)
+      .all<AuditRow>()
+    return rows.results.map((row) => ({
+      actorID: row.actor_id,
+      role: row.role,
+      ownerID: row.owner_id,
+      shortCode: row.short_code,
+      reason: row.reason,
+      outcome: row.outcome,
+      timestamp: row.ts,
+    }))
   }
 }

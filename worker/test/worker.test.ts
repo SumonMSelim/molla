@@ -1,7 +1,8 @@
 import { createExecutionContext, env, waitOnExecutionContext } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
 import worker from '../src/index'
-import { LinkStore } from '../src/store'
+import { listAudit } from '../src/handlers/admin'
+import { AuditStore, LinkStore } from '../src/store'
 
 const BASE = 'http://localhost:8787'
 
@@ -127,6 +128,40 @@ describe('takedown', () => {
   it('requires an Access assertion', async () => {
     const res = await post('/admin/v1/links/abc1234/takedown', { reason: 'abuse' })
     expect(res.status).toBe(401)
+  })
+})
+
+describe('audit', () => {
+  it('requires an Access assertion and only answers GET', async () => {
+    expect((await call('/admin/v1/audit')).status).toBe(401)
+    expect((await post('/admin/v1/audit', {})).status).toBe(405)
+  })
+
+  it('lists recorded events newest first with RFC 3339 timestamps', async () => {
+    const audit = new AuditStore(env.DB)
+    const base = { actorID: 'ops@example.com', role: 'operator', ownerID: '', outcome: 'deleted' } as const
+    await audit.record({ ...base, shortCode: 'first00', reason: 'spam', timestamp: 100 })
+    await audit.record({ ...base, shortCode: 'second0', reason: 'phishing', timestamp: 200 })
+    const res = await listAudit(audit)
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { events: Array<Record<string, unknown>> }
+    expect(body.events.map((e) => e.short_code)).toEqual(['second0', 'first00'])
+    expect(body.events[0]).toEqual({
+      actor_id: 'ops@example.com',
+      role: 'operator',
+      owner_id: '',
+      short_code: 'second0',
+      reason: 'phishing',
+      outcome: 'deleted',
+      ts: '1970-01-01T00:03:20Z',
+    })
+  })
+
+  it('answers 503 when the store fails', async () => {
+    const broken = { list: async () => Promise.reject(new Error('d1 down')) } as unknown as AuditStore
+    const res = await listAudit(broken)
+    expect(res.status).toBe(503)
+    expect(await res.json()).toMatchObject({ error: 'TEMPORARILY_UNAVAILABLE' })
   })
 })
 
