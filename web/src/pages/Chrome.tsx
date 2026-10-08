@@ -6,6 +6,7 @@ const links = [
   { href: '/app/developers/', label: 'Developers' },
   { href: '/app/terms/', label: 'Terms' },
   { href: '/app/privacy/', label: 'Privacy' },
+  { href: 'https://github.com/SumonMSelim/molla', label: 'GitHub', external: true },
 ] as const
 
 export function Chrome({
@@ -30,9 +31,14 @@ export function Chrome({
         </header>
         <div className="flex-1">{children}</div>
         <footer className="mt-16 flex flex-col gap-3 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <nav className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Legal">
+          <nav className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Footer">
             {links.map((link) => (
-              <a key={link.href} href={link.href} className="hover:text-foreground">
+              <a
+                key={link.href}
+                href={link.href}
+                className="hover:text-foreground"
+                {...('external' in link ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+              >
                 {link.label}
               </a>
             ))}

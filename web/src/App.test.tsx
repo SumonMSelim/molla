@@ -10,6 +10,15 @@ describe('App', () => {
     expect(screen.getByText('dev')).toBeInTheDocument()
   })
 
+  it('links to the source repository in the footer', () => {
+    window.history.replaceState(null, '', '/app/')
+    render(<App />)
+    const link = screen.getByRole('link', { name: 'GitHub' })
+    expect(link).toHaveAttribute('href', 'https://github.com/SumonMSelim/molla')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+
   it('shows about, developers, terms, and privacy', () => {
     window.history.replaceState(null, '', '/app/about')
     const about = render(<App />)
