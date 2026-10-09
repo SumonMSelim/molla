@@ -36,7 +36,7 @@ steps: [RUNBOOK.md](RUNBOOK.md).
 - D1 is authoritative; the edge cache is disposable and cache failures fall back to D1.
 - Link creation and idempotency are one D1 batch (transaction).
 - Deletes are versioned and retryable; cache invalidation failure is reported and audited.
-- D1 Time Travel gives 30-day point-in-time restore with no setup.
+- D1 Time Travel gives point-in-time restore with no setup: 7 days on the Free plan, 30 days on Workers Paid.
 - Accepted: the Free plan's daily quota fails closed; the runbook defines the upgrade trigger.
 
 ## Performance efficiency
