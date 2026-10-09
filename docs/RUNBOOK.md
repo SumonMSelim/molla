@@ -25,6 +25,11 @@ D1 counts every index entry a write touches as another row written, including
 the automatic index behind each `TEXT PRIMARY KEY`; the figures above include
 them. Over its daily row limits, D1 rejects queries until 00:00 UTC.
 
+Storage is not a daily limit: on the Free plan one D1 database holds at most
+500 MB (5 GB per account). The cron purge removes expired links and replay
+records, but `stats` rows for purged links are never deleted, so that table
+only grows.
+
 Set a Cloudflare Notification ("Workers usage approaching limit") and treat
 ~70,000 requests/day or ~70,000 D1 writes/day as the trigger to move to
 Workers Paid ($5/mo), which turns the hard stop into overage billing.
@@ -152,7 +157,8 @@ links" so phishing targets stand out.
 
 ## Restore
 
-D1 Time Travel keeps 30 days of history on every plan:
+D1 Time Travel keeps 7 days of history on the Workers Free plan (30 days on
+Workers Paid), so a bad write found later than that cannot be rolled back:
 
 ```sh
 npx wrangler d1 time-travel info molla-prod --env prod
