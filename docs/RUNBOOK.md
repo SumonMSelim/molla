@@ -17,9 +17,13 @@ The account is on the Workers Free plan by design. Daily limits reset at
 | --- | --- | --- |
 | Worker requests | 100,000 | redirects, API, SPA deep links; static assets do not count |
 | Worker CPU | 10 ms per request | redirect is I/O wait; permutation is microseconds |
-| D1 rows written | 100,000 | 1 per redirect (click counter), 1 to 2 per create, 1 per 100 creates (ID block) |
+| D1 rows written | 100,000 | 1 per redirect (click counter; 2 on a code's first click), 3 per create plus 3 more with an `Idempotency-Key` (the web UI always sends one), 2 per takedown, 1 per 100 creates (ID block) |
 | D1 rows read | 5,000,000 | redirect cache misses, stats |
 | Workers Logs | 200,000 events, 3 days | console output |
+
+D1 counts every index entry a write touches as another row written, including
+the automatic index behind each `TEXT PRIMARY KEY`; the figures above include
+them. Over its daily row limits, D1 rejects queries until 00:00 UTC.
 
 Set a Cloudflare Notification ("Workers usage approaching limit") and treat
 ~70,000 requests/day or ~70,000 D1 writes/day as the trigger to move to

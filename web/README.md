@@ -32,4 +32,4 @@ make web-build
 
 CI and native Node use `NPM=npm`.
 
-Build output is `web/dist/` (gitignored). Deploying that tree to the Slice 7 UI bucket is an operator step, not part of this slice.
+Build output is `web/dist/` (gitignored). `make assets` copies it into `worker/public/app/`, together with the icons and the files in `worker/site/`, and `wrangler deploy` serves that tree as Workers Static Assets. Deploys run from a version tag; see `docs/RUNBOOK.md`.
