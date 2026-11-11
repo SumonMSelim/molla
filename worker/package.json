@@ -12,7 +12,7 @@
     "types": "wrangler types"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "0.22.0",
+    "@cloudflare/vitest-pool-workers": "0.23.0",
     "@vitest/coverage-istanbul": "4.1.11",
     "oxlint": "1.86.0",
     "typescript": "7.0.2",
