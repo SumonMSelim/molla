@@ -28,8 +28,11 @@ first (`make assets`), because tests serve the real built assets.
 
 ## Rules that are not obvious
 
-- **Deploys happen only through a GitHub release**: `gh release create vX.Y.Z`
-  triggers `deploy.yml`. Never deploy from a merge, a bare tag, or locally.
+- **Deploys happen only through a GitHub release**: run the `Release`
+  workflow (`release.yml`; auto-bumps semver from conventional commits and
+  dispatches `deploy.yml`), or `gh release create vX.Y.Z` then ensure Deploy
+  runs (a tag created with `GITHUB_TOKEN` does not trigger other workflows).
+  Never deploy from a merge, a bare tag, or locally.
 - **Never run `terraform apply`**, and never run `wrangler deploy` or D1
   migrations against prod. CI plans (read-only); a human applies.
 - **Zone rulesets must stay scoped to the apex host** (`http.host eq

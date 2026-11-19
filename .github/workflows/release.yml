@@ -1,0 +1,110 @@
+name: Release
+
+# Calculates the next semver tag from conventional commits since the latest
+# v*.*.* tag, publishes a GitHub release, then dispatches Deploy on that tag.
+# Tag pushes from GITHUB_TOKEN do not start other workflows, so Deploy is
+# triggered explicitly via workflow_dispatch.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump (auto = conventional commits since last tag)
+        type: choice
+        options:
+          - auto
+          - patch
+          - minor
+          - major
+        default: auto
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require main
+        run: |
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "Release only from main (got ${GITHUB_REF})" >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Calculate next version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          set -euo pipefail
+
+          latest="$(git tag -l 'v*.*.*' --sort=-v:refname | head -n1 || true)"
+          if [ -z "$latest" ]; then
+            echo "No existing v*.*.* tag; refusing to invent v1.0.0" >&2
+            exit 1
+          fi
+
+          if [ -z "$(git rev-list "${latest}..HEAD")" ]; then
+            echo "No commits on main since ${latest}; nothing to release" >&2
+            exit 1
+          fi
+
+          ver="${latest#v}"
+          IFS=. read -r major minor patch <<< "$ver"
+
+          bump="$BUMP"
+          if [ "$bump" = "auto" ]; then
+            subjects="$(git log "${latest}..HEAD" --pretty=%s)"
+            bodies="$(git log "${latest}..HEAD" --pretty=%b)"
+            if printf '%s\n' "$subjects" | grep -qE '^[a-z]+(\([^)]+\))?!:' \
+              || printf '%s\n' "$bodies" | grep -qF 'BREAKING CHANGE:'; then
+              bump=major
+            elif printf '%s\n' "$subjects" | grep -qE '^feat(\(|:)'; then
+              bump=minor
+            else
+              bump=patch
+            fi
+          fi
+
+          case "$bump" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+            *)
+              echo "Unknown bump: $bump" >&2
+              exit 1
+              ;;
+          esac
+
+          tag="v${major}.${minor}.${patch}"
+          echo "Previous ${latest} → ${tag} (${bump})"
+          {
+            echo "tag=${tag}"
+            echo "bump=${bump}"
+            echo "previous=${latest}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: gh release create "$TAG" --generate-notes --target "$GITHUB_SHA" --title "$TAG"
+
+      - name: Dispatch production deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          gh workflow run deploy.yml --ref "$TAG" -f confirm=deploy
+          echo "Dispatched Deploy for ${TAG}"
